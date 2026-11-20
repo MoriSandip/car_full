@@ -35,6 +35,8 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>location</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Connect to the Car Wash service on your local network.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a selfie to record your worker attendance.</string>
 	<key>RCTNewArchEnabled</key>

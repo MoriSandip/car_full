@@ -734,7 +734,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="ownerName">
               Customer Name
@@ -817,9 +817,9 @@ const CCarForm: React.FC<CCarFormProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Society */}
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
             <Label htmlFor="societyId">
               Society <span className="text-red-500">*</span>
             </Label>
@@ -864,7 +864,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
             </Select>
 
             {errors.societyId && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.societyId}
               </p>
             )}
@@ -896,7 +896,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
           </div>
 
           {/* Flat */}
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
             <Label htmlFor="flatId">
               Flat <span className="text-red-500">*</span>
             </Label>
@@ -945,7 +945,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
             </Select>
 
             {errors.flatId && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.flatId}
               </p>
             )}
@@ -994,6 +994,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
                 )
               }
               placeholder="e.g. GJ01AB1234"
+              pattern="[A-Za-z0-9 -]{4,15}"
               maxLength={15}
               disabled={isView || loading}
               aria-invalid={Boolean(
@@ -1007,7 +1008,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
             />
 
             {errors.registrationNumber && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.registrationNumber}
               </p>
             )}
@@ -1035,7 +1036,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
             />
 
             {errors.make && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.make}
               </p>
             )}
@@ -1062,7 +1063,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
             />
 
             {errors.model && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.model}
               </p>
             )}
@@ -1089,7 +1090,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
             />
 
             {errors.color && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.color}
               </p>
             )}
@@ -1173,7 +1174,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
           </div>
 
           {/* Description */}
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
             <Label htmlFor="carImage">Car Image (Optional)</Label>
             <Input
               id="carImage"
@@ -1203,7 +1204,7 @@ const CCarForm: React.FC<CCarFormProps> = ({
           </div>
 
           {/* Description */}
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
             <Label htmlFor="description">
               Description (Optional)
             </Label>

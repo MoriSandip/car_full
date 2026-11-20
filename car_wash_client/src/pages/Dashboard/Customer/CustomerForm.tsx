@@ -121,7 +121,7 @@ const CustomerForm: React.FC<TCustomerFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="customer-name">Full Name *</Label>
           <Input
@@ -153,6 +153,7 @@ const CustomerForm: React.FC<TCustomerFormProps> = ({
             value={form.phone}
             onChange={(event) => updateField("phone", event.target.value)}
             placeholder="Enter phone number"
+            minLength={10}
             disabled={isView}
             required
           />
@@ -168,6 +169,7 @@ const CustomerForm: React.FC<TCustomerFormProps> = ({
               value={form.password || ""}
               onChange={(event) => updateField("password", event.target.value)}
               placeholder="Minimum 8 characters"
+              minLength={8}
               autoComplete="new-password"
               required={mode === "add"}
             />
@@ -193,7 +195,7 @@ const CustomerForm: React.FC<TCustomerFormProps> = ({
             </Select>
           </div>
         )}
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 xl:col-span-3">
           <Label htmlFor="customer-address">Address</Label>
           <Textarea
             id="customer-address"

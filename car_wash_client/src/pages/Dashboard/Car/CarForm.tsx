@@ -494,7 +494,7 @@ const CarForm: React.FC<CarFormProps> = ({
         if (!nextOpen && !loading) onClose();
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="form-dialog-panel max-h-[90vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>
             {mode === "add"
@@ -570,7 +570,7 @@ const CarForm: React.FC<CarFormProps> = ({
               Society & Flat Details
             </h3>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="carSociety">Society *</Label>
                 <Select
@@ -688,7 +688,7 @@ const CarForm: React.FC<CarFormProps> = ({
               Owner Details
             </h3>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="ownerName">Owner Name *</Label>
                 <Input
@@ -711,11 +711,12 @@ const CarForm: React.FC<CarFormProps> = ({
                     updateField("ownerPhone", event.target.value)
                   }
                   placeholder="Enter phone number"
+                  pattern="[0-9+() -]{7,20}"
                   disabled={isView || loading}
                 />
               </div>
 
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2 md:col-span-2 xl:col-span-3">
                 <Label htmlFor="ownerEmail">Owner Email</Label>
                 <Input
                   id="ownerEmail"
@@ -736,7 +737,7 @@ const CarForm: React.FC<CarFormProps> = ({
               Vehicle Details
             </h3>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="registrationNumber">
                   Registration Number *
@@ -751,6 +752,7 @@ const CarForm: React.FC<CarFormProps> = ({
                     )
                   }
                   placeholder="e.g. GJ01AB1234"
+                  pattern="[A-Za-z0-9 -]{4,15}"
                   disabled={isView || loading}
                 />
               </div>
@@ -851,7 +853,7 @@ const CarForm: React.FC<CarFormProps> = ({
                 </Select>
               </div>
 
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2 md:col-span-2 xl:col-span-3">
                 <Label htmlFor="carImage">Car Image (Optional)</Label>
                 <Input
                   id="carImage"
@@ -880,7 +882,7 @@ const CarForm: React.FC<CarFormProps> = ({
                 )}
               </div>
 
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2 md:col-span-2 xl:col-span-3">
                 <Label htmlFor="carDescription">Description</Label>
                 <Textarea
                   id="carDescription"

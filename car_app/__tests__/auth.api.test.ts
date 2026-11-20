@@ -82,7 +82,9 @@ describe('mobile authentication API', () => {
       ([request]) => request as Request,
     );
 
-    expect(loginFetchRequest.url).toContain('/api/v1/customers/login');
+    expect(loginFetchRequest.url).toBe(
+      'http://192.168.1.18:3000/api/v1/customers/login',
+    );
     expect(loginFetchRequest.method).toBe('POST');
     expect(profileRequest.url).toContain('/api/v1/customers/me');
     expect(profileRequest.headers.get('authorization')).toBe(

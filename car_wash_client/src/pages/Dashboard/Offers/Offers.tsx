@@ -294,14 +294,17 @@ export default function Offers() {
       </Card>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogContent className="form-dialog-panel max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>{mode === "add" ? "Add Offer" : "Edit Offer"}</DialogTitle>
             <DialogDescription>Offers apply to the selected plan and reduce its price when creating a membership.</DialogDescription>
           </DialogHeader>
           <form onSubmit={submitForm} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
+            <div className="form-fields-grid grid gap-4 sm:grid-cols-2">
+              <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+                Offer details
+              </h3>
+              <div className="space-y-2 sm:col-span-2 xl:col-span-3">
                 <Label>Plan *</Label>
                 <Select value={form.planId} onValueChange={(value) => setField("planId", value)} disabled={plansQuery.isLoading || plansQuery.isError}>
                   <SelectTrigger><SelectValue placeholder={plansQuery.isLoading ? "Loading plans…" : "Select plan"} /></SelectTrigger>
@@ -322,7 +325,7 @@ export default function Offers() {
                   </p>
                 )}
               </div>
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2 sm:col-span-2 xl:col-span-3">
                 <Label htmlFor="offer-title">Offer title *</Label>
                 <Input id="offer-title" value={form.title} maxLength={100} onChange={(event) => setField("title", event.target.value)} required />
               </div>
@@ -340,6 +343,9 @@ export default function Offers() {
                 <Label htmlFor="discount-value">Discount {form.discountType === "Percentage" ? "(%)" : "(₹)"} *</Label>
                 <Input id="discount-value" type="number" min="0.01" max={form.discountType === "Percentage" ? 100 : undefined} step="0.01" value={form.discountValue} onChange={(event) => setField("discountValue", Number(event.target.value))} required />
               </div>
+              <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+                Offer period and status
+              </h3>
               <div className="space-y-2">
                 <Label htmlFor="offer-start">Start date *</Label>
                 <Input id="offer-start" type="date" value={form.startDate} onChange={(event) => setField("startDate", event.target.value)} required />
@@ -348,14 +354,14 @@ export default function Offers() {
                 <Label htmlFor="offer-end">End date *</Label>
                 <Input id="offer-end" type="date" min={form.startDate} value={form.endDate} onChange={(event) => setField("endDate", event.target.value)} required />
               </div>
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2 sm:col-span-2 xl:col-span-3">
                 <Label>Status</Label>
                 <Select value={form.status} onValueChange={(value) => setField("status", value as TOfferForm["status"])}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2 sm:col-span-2 xl:col-span-3">
                 <Label htmlFor="offer-description">Description</Label>
                 <Textarea id="offer-description" value={form.description} maxLength={1000} rows={3} onChange={(event) => setField("description", event.target.value)} />
               </div>

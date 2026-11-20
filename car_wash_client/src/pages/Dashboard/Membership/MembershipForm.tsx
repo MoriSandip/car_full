@@ -467,7 +467,7 @@ const MembershipForm: React.FC<TMembershipFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {isView && initialData && (
-        <div className="grid gap-4 rounded-lg border p-4 text-sm sm:grid-cols-2">
+        <div className="form-fields-grid grid gap-4 rounded-lg border p-4 text-sm sm:grid-cols-2">
           {[
             [
               "Society",
@@ -520,7 +520,10 @@ const MembershipForm: React.FC<TMembershipFormProps> = ({
         </div>
       )}
       {!isView && (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
+        <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+          Membership selection
+        </h3>
         <div className="space-y-2">
           <Label>Society *</Label>
           <Select
@@ -701,6 +704,9 @@ const MembershipForm: React.FC<TMembershipFormProps> = ({
           )}
         </div>
 
+        <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+          Duration and payment
+        </h3>
         <div className="space-y-2">
           <Label>Start Date *</Label>
           <Input
@@ -770,7 +776,7 @@ const MembershipForm: React.FC<TMembershipFormProps> = ({
           </Select>
         </div>
 
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 xl:col-span-3">
           <Label>Remarks</Label>
           <Textarea
             value={form.remarks || ""}

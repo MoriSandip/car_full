@@ -1,5 +1,5 @@
 {
   "name": "CwApp",
   "displayName": "CwApp",
-  "apiOrigin": ""
+  "apiOrigin": "http://192.168.1.18:3000"
 }

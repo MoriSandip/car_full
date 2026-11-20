@@ -137,8 +137,11 @@ const PlanForm: React.FC<Props> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="space-y-2 md:col-span-2">
+      <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
+        <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+          Plan details
+        </h3>
+        <div className="space-y-2 md:col-span-2 xl:col-span-3">
           <Label htmlFor="societyId">Society *</Label>
           <Select
             value={form.societyId}
@@ -181,6 +184,9 @@ const PlanForm: React.FC<Props> = ({
           </Select>
         </div>
 
+        <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+          Pricing and services
+        </h3>
         <div className="space-y-2">
           <Label htmlFor="price">Price (₹) *</Label>
           <Input id="price" type="number" min={0} step="0.01" value={form.price}
@@ -217,7 +223,7 @@ const PlanForm: React.FC<Props> = ({
           </Select>
         </div>
 
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 xl:col-span-3">
           <Label htmlFor="services">Included Cleaning Services *</Label>
           <Textarea id="services" value={servicesText}
             onChange={(e) => setServicesText(e.target.value)}
@@ -226,7 +232,7 @@ const PlanForm: React.FC<Props> = ({
           <p className="text-xs text-muted-foreground">Separate services with commas or new lines.</p>
         </div>
 
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 xl:col-span-3">
           <Label htmlFor="description">Description</Label>
           <Textarea id="description" value={form.description || ""}
             onChange={(e) => updateField("description", e.target.value)}

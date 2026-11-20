@@ -287,7 +287,7 @@ const FlatForm: React.FC<FlatFormProps> = ({
         if (!nextOpen && !loading) onClose();
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="form-dialog-panel max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
@@ -351,9 +351,9 @@ const FlatForm: React.FC<FlatFormProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="form-fields-grid grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Society */}
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2 sm:col-span-2 xl:col-span-3">
               <label className="text-sm font-medium">
                 Society <span className="text-red-500">*</span>
               </label>
@@ -390,13 +390,13 @@ const FlatForm: React.FC<FlatFormProps> = ({
               </Select>
 
               {errors.societyId && (
-                <p className="text-sm text-red-500">
+                <p role="alert" className="text-sm text-red-500">
                   {errors.societyId}
                 </p>
               )}
 
               {societiesError && (
-                <p className="text-sm text-red-500">
+                <p role="alert" className="text-sm text-red-500">
                   Unable to load societies. Please refresh and try again.
                 </p>
               )}
@@ -428,7 +428,7 @@ const FlatForm: React.FC<FlatFormProps> = ({
               />
 
               {errors.flatNumber && (
-                <p className="text-sm text-red-500">
+                <p role="alert" className="text-sm text-red-500">
                   {errors.flatNumber}
                 </p>
               )}
@@ -473,7 +473,7 @@ const FlatForm: React.FC<FlatFormProps> = ({
               />
 
               {errors.floorNumber && (
-                <p className="text-sm text-red-500">
+                <p role="alert" className="text-sm text-red-500">
                   {errors.floorNumber}
                 </p>
               )}
@@ -533,7 +533,7 @@ const FlatForm: React.FC<FlatFormProps> = ({
               />
 
               {errors.area && (
-                <p className="text-sm text-red-500">
+                <p role="alert" className="text-sm text-red-500">
                   {errors.area}
                 </p>
               )}
@@ -577,7 +577,7 @@ const FlatForm: React.FC<FlatFormProps> = ({
             </div>
 
             {/* Description */}
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2 sm:col-span-2 xl:col-span-3">
               <label className="text-sm font-medium">
                 Description
               </label>
@@ -595,7 +595,7 @@ const FlatForm: React.FC<FlatFormProps> = ({
           </div>
 
           {submitError && (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {submitError}
             </div>
           )}

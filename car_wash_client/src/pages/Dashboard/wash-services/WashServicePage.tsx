@@ -661,7 +661,7 @@ const WashServicePage: React.FC = () => {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="form-dialog-panel max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {mode === "add"
@@ -678,8 +678,11 @@ const WashServicePage: React.FC = () => {
           </DialogHeader>
 
           <form onSubmit={handleFormSubmit} className="space-y-5">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
+            <div className="form-fields-grid grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+                Service information
+              </h3>
+              <div className="space-y-2 sm:col-span-2 xl:col-span-3">
                 <Label htmlFor="serviceName">Service Name *</Label>
                 <Input
                   id="serviceName"
@@ -737,7 +740,10 @@ const WashServicePage: React.FC = () => {
                 />
               </div>
 
-              <div className="space-y-2 sm:col-span-2">
+              <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+                Availability and description
+              </h3>
+              <div className="space-y-2 sm:col-span-2 xl:col-span-3">
                 <Label htmlFor="serviceStatus">Status *</Label>
                 <Select
                   value={form.status}
@@ -759,7 +765,7 @@ const WashServicePage: React.FC = () => {
                 </Select>
               </div>
 
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2 sm:col-span-2 xl:col-span-3">
                 <Label htmlFor="serviceDescription">Description</Label>
                 <Textarea
                   id="serviceDescription"
@@ -824,7 +830,7 @@ const WashServicePage: React.FC = () => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="form-dialog-panel">
           <DialogHeader>
             <DialogTitle>Create daily time slots</DialogTitle>
             <DialogDescription>
@@ -846,7 +852,7 @@ const WashServicePage: React.FC = () => {
                 required
               />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="form-fields-grid grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="slot-start">Start time *</Label>
                 <Input

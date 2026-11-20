@@ -1,5 +1,6 @@
 import express, { Application } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 
 import notFound from './app/middlewares/notFound';
 import globalErrorHandler from './app/middlewares/globalErrorhandler';
@@ -8,6 +9,18 @@ import router from './app/routes';
 import { StripePaymentController } from './modules/payment/stripe.controller';
 
 const app: Application = express();
+const isProduction = process.env.NODE_ENV === 'production';
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        'upgrade-insecure-requests': isProduction ? [] : null,
+      },
+    },
+    strictTransportSecurity: isProduction ? undefined : false,
+  }),
+);
 
 if (process.env.VERCEL) {
   app.set('trust proxy', 1);

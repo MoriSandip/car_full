@@ -254,6 +254,7 @@ const CSocietyForm: React.FC<SocietyFormProps> = ({
       required?: boolean;
       type?: string;
       maxLength?: number;
+      pattern?: string;
     },
   ) => (
     <div className="space-y-2" key={field}>
@@ -288,6 +289,7 @@ const CSocietyForm: React.FC<SocietyFormProps> = ({
           }}
           placeholder={placeholder}
           maxLength={options?.maxLength}
+          pattern={options?.pattern}
           disabled={isView || loading}
           aria-invalid={Boolean(errors[field])}
           className={`pl-10 ${
@@ -297,7 +299,7 @@ const CSocietyForm: React.FC<SocietyFormProps> = ({
       </div>
 
       {errors[field] && (
-        <p className="text-xs text-red-500">
+        <p role="alert" className="text-xs text-red-500">
           {errors[field]}
         </p>
       )}
@@ -370,7 +372,7 @@ const CSocietyForm: React.FC<SocietyFormProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
           {renderField(
             "name",
             "Society Name",
@@ -386,7 +388,7 @@ const CSocietyForm: React.FC<SocietyFormProps> = ({
             <UserRound className="h-4 w-4" />,
           )}
 
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
             <Label htmlFor="address">
               Address <span className="text-red-500">*</span>
             </Label>
@@ -410,7 +412,7 @@ const CSocietyForm: React.FC<SocietyFormProps> = ({
             </div>
 
             {errors.address && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.address}
               </p>
             )}
@@ -436,7 +438,7 @@ const CSocietyForm: React.FC<SocietyFormProps> = ({
             "Pincode",
             "6-digit pincode",
             <MapPin className="h-4 w-4" />,
-            { maxLength: 6 },
+            { maxLength: 6, pattern: "[0-9]{6}" },
           )}
         </div>
       </div>
@@ -455,13 +457,13 @@ const CSocietyForm: React.FC<SocietyFormProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
           {renderField(
             "phone",
             "Mobile Number",
             "10-digit mobile number",
             <Phone className="h-4 w-4" />,
-            { maxLength: 10 },
+            { maxLength: 10, pattern: "[6-9][0-9]{9}" },
           )}
 
           {renderField(

@@ -1382,7 +1382,7 @@ const CustomerBookings = ({
           else closeForm();
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogContent className="form-dialog-panel max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <form onSubmit={handleSubmit} className="space-y-5">
             <DialogHeader>
               <DialogTitle>Book a car wash</DialogTitle>
@@ -1401,6 +1401,11 @@ const CustomerBookings = ({
               </div>
             )}
 
+            <section className="space-y-4">
+              <h3 className="border-b pb-2 text-sm font-semibold">
+                Vehicle and wash details
+              </h3>
+              <div className="form-fields-grid grid gap-4">
             <div className="space-y-2">
               <Label htmlFor="booking-car">Car *</Label>
               <Select
@@ -1577,9 +1582,11 @@ const CustomerBookings = ({
                 </Select>
               </div>
             )}
+              </div>
+            </section>
 
-            <div className="space-y-3">
-              <div>
+            <section className="space-y-4">
+              <div className="border-b pb-2">
                 <Label>Date range and time slots *</Label>
                 <p className="mt-1 text-xs text-slate-500">
                   Choose a start and end date, inclusive, then choose a slot for
@@ -1587,7 +1594,7 @@ const CustomerBookings = ({
                   are skipped.
                 </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="form-fields-grid grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="booking-start-date">Start date *</Label>
                   <input
@@ -1632,6 +1639,7 @@ const CustomerBookings = ({
                   />
                 </div>
               </div>
+              <div className="space-y-3">
               {!form.serviceId || !form.startDate || !form.endDate ? (
                 <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-500">
                   Select a service and date range to see available times.
@@ -1721,6 +1729,7 @@ const CustomerBookings = ({
                 </div>
               )}
             </div>
+            </section>
 
             <div className="space-y-2">
               <Label htmlFor="booking-remarks">Instructions (optional)</Label>

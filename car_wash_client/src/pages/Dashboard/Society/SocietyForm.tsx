@@ -226,7 +226,10 @@ const SocietyForm: React.FC<SocietyFormProps> = ({
       )}
 
       {/* Society details */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
+        <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+          Society and location
+        </h3>
         {/* Society name */}
         <div className="space-y-2">
           <Label htmlFor="society-name">
@@ -288,6 +291,7 @@ const SocietyForm: React.FC<SocietyFormProps> = ({
             value={formData.pincode || ""}
             onChange={handleChange}
             placeholder="Enter 6-digit Pincode"
+            pattern="[0-9]{6}"
             maxLength={6}
             disabled={isView || loading}
           />
@@ -318,6 +322,7 @@ const SocietyForm: React.FC<SocietyFormProps> = ({
             name="phone"
             type="tel"
             inputMode="numeric"
+            pattern="[6-9][0-9]{9}"
             maxLength={10}
             value={formData.phone || ""}
             onChange={handleChange}
@@ -326,8 +331,11 @@ const SocietyForm: React.FC<SocietyFormProps> = ({
           />
         </div>
 
+        <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+          Contact and address
+        </h3>
         {/* Email */}
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 xl:col-span-3">
           <Label htmlFor="society-email">Email Address</Label>
 
           <Input
@@ -342,7 +350,7 @@ const SocietyForm: React.FC<SocietyFormProps> = ({
         </div>
 
         {/* Address */}
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 xl:col-span-3">
           <Label htmlFor="society-address">
             Complete Address <span className="text-red-500">*</span>
           </Label>
@@ -360,7 +368,7 @@ const SocietyForm: React.FC<SocietyFormProps> = ({
         </div>
 
         {/* Description */}
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-2 xl:col-span-3">
           <Label htmlFor="society-description">Description</Label>
 
           <Textarea

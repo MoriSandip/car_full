@@ -431,9 +431,9 @@ const CFlatForm: React.FC<CFlatFormProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="form-fields-grid grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Society */}
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
             <Label htmlFor="societyId">
               Society <span className="text-red-500">*</span>
             </Label>
@@ -476,7 +476,7 @@ const CFlatForm: React.FC<CFlatFormProps> = ({
             </Select>
 
             {errors.societyId && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.societyId}
               </p>
             )}
@@ -534,7 +534,7 @@ const CFlatForm: React.FC<CFlatFormProps> = ({
             </div>
 
             {errors.flatNumber && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.flatNumber}
               </p>
             )}
@@ -581,7 +581,7 @@ const CFlatForm: React.FC<CFlatFormProps> = ({
             />
 
             {errors.floorNumber && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.floorNumber}
               </p>
             )}
@@ -641,7 +641,7 @@ const CFlatForm: React.FC<CFlatFormProps> = ({
             </div>
 
             {errors.area && (
-              <p className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-500">
                 {errors.area}
               </p>
             )}
@@ -673,7 +673,7 @@ const CFlatForm: React.FC<CFlatFormProps> = ({
           </div>
 
           {/* Description */}
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2 md:col-span-2 xl:col-span-3">
             <Label htmlFor="description">
               Description (Optional)
             </Label>

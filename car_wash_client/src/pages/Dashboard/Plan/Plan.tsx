@@ -215,7 +215,7 @@ const Plan: React.FC = () => {
       </Card>
 
       <Dialog open={formOpen} onOpenChange={(open) => { setFormOpen(open); if (!open) setSelectedPlan(null); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="form-dialog-panel max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{mode === "add" ? "Add Plan" : mode === "edit" ? "Edit Plan" : "View Plan"}</DialogTitle>
             <DialogDescription>{mode === "view" ? "Plan information and charges." : "Enter society-wise plan details below."}</DialogDescription>

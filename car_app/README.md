@@ -12,9 +12,19 @@ URL is configured in `app/config/api.ts`:
 
 - Android emulator: `http://10.0.2.2:3000/api/v1`
 - iOS simulator: `http://localhost:3000/api/v1`
-- Physical device: replace the host with the development computer's LAN IP
-  (for example, `http://192.168.1.20:3000/api/v1`) and keep both devices on the
-  same network. Use HTTPS for non-local deployments.
+- Development builds currently use
+  `http://192.168.1.18:3000/api/v1` (configured as `apiOrigin` in `app.json`)
+  for physical devices on the same Wi-Fi as the backend. Change it to the
+  computer's current private LAN address if DHCP changes it. HTTP is enabled
+  only for Android debug builds and local-network access; Android release
+  builds and production JavaScript require HTTPS.
+- HTTP sends login credentials and tokens without transport encryption. Use
+  this endpoint only on a trusted local network for development testing; use
+  HTTPS before testing on an untrusted network or creating a release.
+
+The mobile app calls the backend directly on port `3000`. Do not use the web
+client URL `http://localhost:5173/api/v1`: port `5173` is the web development
+server, and `localhost` on a phone refers to the phone itself.
 
 ## Role flows
 

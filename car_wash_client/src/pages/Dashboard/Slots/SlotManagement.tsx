@@ -304,7 +304,7 @@ const SlotManagement = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="form-fields-grid grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="slot-start-date">Start date</Label>
                     <Input
@@ -338,7 +338,7 @@ const SlotManagement = () => {
                     />
                   </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="form-fields-grid grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="slot-start-time">Start time</Label>
                     <Input

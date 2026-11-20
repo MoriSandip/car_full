@@ -18,6 +18,7 @@ const rawBaseQuery = fetchBaseQuery({
     return headers;
   },
 });
+console.log('API_BASE_URL:-----', API_BASE_URL);
 
 export const api = createApi({
   reducerPath: 'api',

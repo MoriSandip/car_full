@@ -1263,7 +1263,7 @@ const BookingPage: React.FC = () => {
           else setFormOpen(true);
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="form-dialog-panel max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               {dialogMode === "add" ? "Add Booking" : "Booking Details"}
@@ -1277,7 +1277,7 @@ const BookingPage: React.FC = () => {
 
           {dialogMode === "add" ? (
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="form-fields-grid grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Society *</Label>
                   <Select
@@ -1485,7 +1485,7 @@ const BookingPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="space-y-3 sm:col-span-2">
+                <div className="space-y-3 sm:col-span-2 xl:col-span-3">
                   <div>
                     <Label>Time slot for each date</Label>
                     <p className="text-sm text-muted-foreground">

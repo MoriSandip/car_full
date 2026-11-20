@@ -6,6 +6,7 @@ const configuredOrigin =
   typeof appConfig.apiOrigin === 'string' ? appConfig.apiOrigin.trim() : '';
 const developmentOrigin = Platform.select({
   android: 'http://10.0.2.2:3000',
+  ios: 'http://localhost:3000',
   default: 'http://localhost:3000',
 });
 
@@ -13,14 +14,7 @@ const API_ORIGIN = configuredOrigin || (isDevelopment ? developmentOrigin : '');
 
 if (API_ORIGIN) {
   const parsedOrigin = new URL(API_ORIGIN);
-  const isLoopback =
-    parsedOrigin.hostname === 'localhost' ||
-    parsedOrigin.hostname === '127.0.0.1' ||
-    parsedOrigin.hostname === '10.0.2.2';
-  if (
-    parsedOrigin.protocol !== 'https:' &&
-    !(isDevelopment && isLoopback)
-  ) {
+  if (parsedOrigin.protocol !== 'https:' && !isDevelopment) {
     throw new Error('The mobile app API origin must use HTTPS.');
   }
 }
