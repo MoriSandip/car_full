@@ -1,5 +1,5 @@
 import {Platform} from 'react-native';
-import appConfig from '../../app.json';
+import appConfig from '../../../app.json';
 
 const isDevelopment = typeof __DEV__ !== 'undefined' && __DEV__;
 const configuredOrigin =
