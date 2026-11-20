@@ -13,8 +13,10 @@ import {
   ActionButton,
   Card,
   colors,
+  DetailsSheet,
   InfoMessage,
   LoadingMessage,
+  ListItemPressable,
   Page,
   PageTitle,
 } from '../../components/mobile/ui';
@@ -63,6 +65,7 @@ const PaymentRow = ({
   onReceipt: (bookingId: string) => void;
   receiptDisabled: boolean;
 }) => {
+  const [detailsVisible, setDetailsVisible] = useState(false);
   const booking = transaction.bookingId;
   const membership = transaction.membershipId;
   const title = booking
@@ -74,60 +77,166 @@ const PaymentRow = ({
       ? `${new Date(membership.startDate).toLocaleDateString()} – ${new Date(membership.endDate).toLocaleDateString()}`
       : '';
   return (
-    <Card style={styles.transactionCard}>
-      <View style={styles.transactionHeader}>
-        <View style={styles.amountGroup}>
-          <View style={styles.providerIcon}>
-            <Feather
-              name={transaction.provider === 'Cash' ? 'dollar-sign' : 'credit-card'}
-              size={17}
-              color={colors.primary}
-            />
+    <>
+      <Card style={styles.transactionCard}>
+        <ListItemPressable
+          accessibilityLabel={`View ${title} payment details`}
+          onPress={() => setDetailsVisible(true)}
+          style={styles.transactionDetailsTap}>
+          <View style={styles.transactionHeader}>
+            <View style={styles.amountGroup}>
+              <View style={styles.providerIcon}>
+                <Feather
+                  name={transaction.provider === 'Cash' ? 'dollar-sign' : 'credit-card'}
+                  size={17}
+                  color={colors.primary}
+                />
+              </View>
+              <Text style={styles.amount} numberOfLines={1}>
+                {formatMoney(transaction.amount)}
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.status,
+                transaction.status === 'Paid' && styles.paid,
+                transaction.status === 'Failed' && styles.failed,
+                transaction.status === 'Pending' && styles.pending,
+                transaction.status === 'Refunded' && styles.refunded,
+              ]}>
+              {transaction.status}
+            </Text>
           </View>
-          <Text style={styles.amount}>{formatMoney(transaction.amount)}</Text>
-        </View>
-        <Text
-          style={[
-            styles.status,
-            transaction.status === 'Paid' && styles.paid,
-            transaction.status === 'Failed' && styles.failed,
-            transaction.status === 'Pending' && styles.pending,
-            transaction.status === 'Refunded' && styles.refunded,
-          ]}>
-          {transaction.status}
-        </Text>
-      </View>
-      <Text style={styles.transactionTitle}>{title}</Text>
-      {details ? <Text style={styles.copy}>{details}</Text> : null}
-      <View style={styles.metaRow}>
-        <Text style={styles.method}>
-          {transaction.provider === 'Stripe'
-            ? 'Online · Stripe'
-            : transaction.provider}
-        </Text>
-        <Text style={styles.copy}>{formatDate(transaction.createdAt)}</Text>
-      </View>
-      {transaction.reference ? (
-        <Text style={styles.copy}>Reference: {transaction.reference}</Text>
-      ) : null}
-      {transaction.provider === 'Cash' && transaction.recordedByWorker?.name ? (
-        <Text style={styles.copy}>
-          Collected by {transaction.recordedByWorker.name}
-        </Text>
-      ) : null}
-      {transaction.provider === 'Cash' &&
-      transaction.status === 'Paid' &&
-      booking?._id ? (
-        <ActionButton
-          title="Download cash receipt PDF"
-          variant="secondary"
-          disabled={receiptDisabled}
-          onPress={() => onReceipt(booking._id)}
+          <Text style={styles.transactionTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          {details ? (
+            <Text style={styles.copy} numberOfLines={1}>
+              {details}
+            </Text>
+          ) : null}
+          <View style={styles.metaRow}>
+            <Text style={styles.method}>
+              {transaction.provider === 'Stripe'
+                ? 'Online · Stripe'
+                : transaction.provider}
+            </Text>
+            <Text style={styles.metaDate} numberOfLines={1}>
+              {formatDate(transaction.createdAt)}
+            </Text>
+          </View>
+          {transaction.reference || transaction.recordedByWorker?.name ? (
+            <Text style={styles.copy} numberOfLines={1}>
+              {[
+                transaction.reference ? `Ref ${transaction.reference}` : '',
+                transaction.recordedByWorker?.name
+                  ? `Cash by ${transaction.recordedByWorker.name}`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          ) : null}
+          <View style={styles.viewDetails}>
+            <Text style={styles.viewDetailsText}>View full details</Text>
+            <Feather name="chevron-right" size={16} color={colors.primary} />
+          </View>
+        </ListItemPressable>
+        {transaction.provider === 'Cash' &&
+        transaction.status === 'Paid' &&
+        booking?._id ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Download cash receipt PDF"
+            disabled={receiptDisabled}
+            onPress={() => onReceipt(booking._id)}
+            style={[styles.receiptButton, receiptDisabled && styles.disabled]}>
+            <Feather name="download" size={15} color={colors.primary} />
+            <Text style={styles.receiptText}>Download receipt</Text>
+          </Pressable>
+        ) : null}
+      </Card>
+      <DetailsSheet
+        visible={detailsVisible}
+        setVisible={setDetailsVisible}
+        title="Payment details">
+        <Text style={styles.transactionTitle}>{title}</Text>
+        <PaymentDetail title="Amount" value={formatMoney(transaction.amount)} />
+        <PaymentDetail title="Status" value={transaction.status} />
+        <PaymentDetail
+          title="Payment method"
+          value={
+            transaction.provider === 'Stripe'
+              ? 'Online · Stripe'
+              : transaction.provider
+          }
         />
-      ) : null}
-    </Card>
+        <PaymentDetail
+          title="Paid / created on"
+          value={formatDate(transaction.createdAt)}
+        />
+        {transaction.reference ? (
+          <PaymentDetail title="Reference" value={transaction.reference} />
+        ) : null}
+        {transaction.recordedByWorker?.name ? (
+          <PaymentDetail
+            title="Cash collected by"
+            value={transaction.recordedByWorker.name}
+          />
+        ) : null}
+        {booking ? (
+          <>
+            <Text style={styles.detailSection}>Booking</Text>
+            <PaymentDetail
+              title="Service"
+              value={booking.serviceNameSnapshot || 'Individual booking'}
+            />
+            <PaymentDetail
+              title="Scheduled"
+              value={`${new Date(booking.bookingDate).toLocaleDateString()} · ${booking.bookingTime}`}
+            />
+            <PaymentDetail
+              title="Booking status"
+              value={booking.status}
+            />
+            <PaymentDetail
+              title="Payment type"
+              value={booking.paymentType || 'Individual'}
+            />
+          </>
+        ) : membership ? (
+          <>
+            <Text style={styles.detailSection}>Membership</Text>
+            <PaymentDetail
+              title="Validity"
+              value={`${new Date(membership.startDate).toLocaleDateString()} – ${
+                new Date(membership.endDate).toLocaleDateString()
+              }`}
+            />
+            <PaymentDetail title="Membership status" value={membership.status} />
+          </>
+        ) : null}
+        {transaction.provider === 'Cash' &&
+        transaction.status === 'Paid' &&
+        booking?._id ? (
+          <ActionButton
+            title={receiptDisabled ? 'Preparing receipt...' : 'Download cash receipt'}
+            onPress={() => onReceipt(booking._id)}
+            disabled={receiptDisabled}
+            variant="secondary"
+          />
+        ) : null}
+      </DetailsSheet>
+    </>
   );
 };
+
+const PaymentDetail = ({title, value}: {title: string; value?: string}) => (
+  <View style={styles.paymentDetail}>
+    <Text style={styles.paymentDetailLabel}>{title}</Text>
+    <Text style={styles.paymentDetailValue}>{value || '—'}</Text>
+  </View>
+);
 
 const CustomerPaymentHistoryScreen = () => {
   const [page, setPage] = useState(1);
@@ -184,36 +293,30 @@ const CustomerPaymentHistoryScreen = () => {
       />
       <Card style={styles.summaryCard}>
         <View style={styles.summaryHeader}>
-          <View style={styles.summaryIcon}>
-            <Feather name="credit-card" size={17} color={colors.primary} />
-          </View>
-          <View>
-            <Text style={styles.summaryTitle}>Payment summary</Text>
-            <Text style={styles.summaryHint}>Your transactions at a glance</Text>
-          </View>
+          <Text style={styles.summaryTitle}>Payment summary</Text>
         </View>
         <View style={styles.summaryGrid}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Total paid</Text>
-            <Text style={styles.summaryValue}>
+            <Text style={styles.summaryLabel} numberOfLines={1}>Total paid</Text>
+            <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit>
               {formatMoney(summary?.paidAmount ?? 0)}
             </Text>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Online paid</Text>
-            <Text style={styles.summaryValue}>
+            <Text style={styles.summaryLabel} numberOfLines={1}>Online paid</Text>
+            <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit>
               {formatMoney(summary?.onlinePaidAmount ?? 0)}
             </Text>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Cash paid</Text>
-            <Text style={styles.summaryValue}>
+            <Text style={styles.summaryLabel} numberOfLines={1}>Cash paid</Text>
+            <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit>
               {formatMoney(summary?.cashPaidAmount ?? 0)}
             </Text>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Pending</Text>
-            <Text style={styles.summaryValue}>
+            <Text style={styles.summaryLabel} numberOfLines={1}>Pending</Text>
+            <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit>
               {formatMoney(summary?.pendingAmount ?? 0)}
             </Text>
           </View>
@@ -317,28 +420,22 @@ const FilterChip = ({
 );
 
 const styles = StyleSheet.create({
-  summaryCard: {gap: 14, borderRadius: 19},
-  summaryHeader: {flexDirection: 'row', alignItems: 'center', gap: 10},
-  summaryIcon: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: colors.paleBlue,
-  },
-  summaryTitle: {fontSize: 16, fontWeight: '800', color: colors.ink},
-  summaryHint: {marginTop: 2, fontSize: 11, color: colors.muted},
-  summaryGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 9},
+  summaryCard: {gap: 9, borderRadius: 14, paddingVertical: 11},
+  summaryHeader: {flexDirection: 'row', alignItems: 'center'},
+  summaryTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
+  summaryGrid: {flexDirection: 'row', gap: 7},
   summaryItem: {
-    width: '48%',
-    gap: 5,
-    padding: 11,
-    borderRadius: 13,
-    backgroundColor: colors.canvas,
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
   },
-  summaryLabel: {fontSize: 11, fontWeight: '600', color: colors.muted},
-  summaryValue: {fontSize: 15, fontWeight: '800', color: colors.ink},
+  summaryLabel: {fontSize: 9, fontWeight: '600', color: colors.muted},
+  summaryValue: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.ink,
+    flexShrink: 1,
+  },
   filterBlock: {gap: 9},
   filterHeading: {fontSize: 13, fontWeight: '700', color: colors.ink},
   filters: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
@@ -353,14 +450,34 @@ const styles = StyleSheet.create({
   chipSelected: {backgroundColor: colors.paleBlue, borderColor: colors.primary},
   chipText: {fontSize: 12, fontWeight: '600', color: colors.muted},
   chipTextSelected: {color: colors.primaryDark},
-  transactionCard: {gap: 9, borderRadius: 18},
+  transactionCard: {gap: 7, borderRadius: 14, paddingVertical: 11},
+  transactionDetailsTap: {gap: 7},
+  viewDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 40,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 6,
+  },
+  viewDetailsText: {fontSize: 12, fontWeight: '700', color: colors.primary},
+  paymentDetail: {
+    gap: 3,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  paymentDetailLabel: {fontSize: 11, fontWeight: '600', color: colors.muted},
+  paymentDetailValue: {fontSize: 14, lineHeight: 20, color: colors.ink},
+  detailSection: {fontSize: 14, fontWeight: '800', color: colors.ink, marginTop: 4},
   transactionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  amountGroup: {flexDirection: 'row', alignItems: 'center', gap: 9},
+  amountGroup: {flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8},
   providerIcon: {
     width: 34,
     height: 34,
@@ -369,7 +486,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: colors.paleBlue,
   },
-  amount: {fontSize: 18, fontWeight: '900', color: colors.ink},
+  amount: {fontSize: 16, fontWeight: '900', color: colors.ink, flexShrink: 1},
   status: {
     overflow: 'hidden',
     borderRadius: 10,
@@ -384,9 +501,16 @@ const styles = StyleSheet.create({
   failed: {color: colors.danger, backgroundColor: '#FDECEA'},
   pending: {color: '#A15C00', backgroundColor: '#FFF4E5'},
   refunded: {color: '#6941C6', backgroundColor: '#F4EBFF'},
-  transactionTitle: {fontSize: 15, fontWeight: '700', color: colors.ink},
+  transactionTitle: {fontSize: 14, fontWeight: '700', color: colors.ink},
   copy: {fontSize: 12, lineHeight: 18, color: colors.muted},
   method: {fontSize: 12, fontWeight: '700', color: colors.primaryDark},
+  metaDate: {
+    flexShrink: 1,
+    textAlign: 'right',
+    fontSize: 11,
+    lineHeight: 15,
+    color: colors.muted,
+  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -394,6 +518,18 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
   },
+  receiptButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 7,
+  },
+  receiptText: {fontSize: 12, fontWeight: '700', color: colors.primary},
+  disabled: {opacity: 0.5},
   pagination: {
     flexDirection: 'row',
     alignItems: 'center',

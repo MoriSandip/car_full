@@ -2,6 +2,7 @@ import React, {useMemo, useState} from 'react';
 import {
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -50,16 +51,6 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
         : bookings.filter(booking => idOf(booking.carId) === selectedCarId),
     [bookings, selectedCarId],
   );
-  const selectedCar = cars.find(car => car._id === selectedCarId);
-  const activeCount = historyBookings.filter(
-    booking =>
-      ['Working', 'Paused'].includes(booking.workStatus || '') ||
-      booking.status === 'InProgress',
-  ).length;
-  const completedCount = historyBookings.filter(
-    booking =>
-      booking.status === 'Completed' || booking.workStatus === 'Completed',
-  ).length;
   const refreshPage = () => {
     setIsPullRefreshing(true);
     setRefreshError(false);
@@ -86,8 +77,11 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
         subtitle="Track your scheduled washes, payment and service status."
       />
       <View style={styles.filterSection}>
-        <Text style={styles.filterTitle}>Cleaning history by car</Text>
-        <View style={styles.carFilters}>
+        <Text style={styles.filterTitle}>Filter by car</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.carFilters}>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{selected: selectedCarId === 'all'}}
@@ -100,8 +94,9 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
               style={[
                 styles.carFilterText,
                 selectedCarId === 'all' && styles.carFilterTextSelected,
-              ]}>
-              All cars ({bookings.length})
+              ]}
+              numberOfLines={1}>
+              All ({bookings.length})
             </Text>
           </Pressable>
           {cars.map(car => {
@@ -120,28 +115,14 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
                   style={[
                     styles.carFilterText,
                     selected && styles.carFilterTextSelected,
-                  ]}>
-                  {carTitle(car)} ({count})
+                  ]}
+                  numberOfLines={1}>
+                  {car.registrationNumber || carTitle(car)} ({count})
                 </Text>
               </Pressable>
             );
           })}
-        </View>
-        {selectedCar ? (
-          <Card style={styles.carSummary}>
-            <Text style={styles.summaryTitle}>{carTitle(selectedCar)}</Text>
-            <Text style={styles.emptyCopy}>
-              {historyBookings.length} washes · {activeCount} in progress ·{' '}
-              {completedCount} completed
-            </Text>
-            {historyBookings[0] ? (
-              <Text style={styles.emptyCopy}>
-                Latest wash: {historyBookings[0].serviceNameSnapshot} ·{' '}
-                {historyBookings[0].workStatus || historyBookings[0].status}
-              </Text>
-            ) : null}
-          </Card>
-        ) : null}
+        </ScrollView>
       </View>
       {refreshError ? (
         <InfoMessage
@@ -208,11 +189,12 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
 };
 
 const styles = StyleSheet.create({
-  list: {gap: 10},
+  list: {gap: 8},
   filterSection: {gap: 8},
   filterTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
-  carFilters: {flexDirection: 'row', flexWrap: 'wrap', gap: 7},
+  carFilters: {flexDirection: 'row', gap: 7, paddingRight: 4},
   carFilter: {
+    maxWidth: 190,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 18,
@@ -221,10 +203,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   carFilterSelected: {backgroundColor: colors.paleBlue, borderColor: colors.primary},
-  carFilterText: {fontSize: 12, color: colors.muted, fontWeight: '600'},
+  carFilterText: {flexShrink: 1, fontSize: 12, color: colors.muted, fontWeight: '600'},
   carFilterTextSelected: {color: colors.primary},
-  carSummary: {gap: 4},
-  summaryTitle: {fontSize: 15, fontWeight: '800', color: colors.ink},
   emptyTitle: {fontSize: 16, fontWeight: '800', color: colors.ink},
   emptyCopy: {fontSize: 13, lineHeight: 19, color: colors.muted},
   emptyCard: {alignItems: 'flex-start', gap: 12, borderRadius: 19},

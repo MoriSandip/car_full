@@ -14,6 +14,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import {BottomSheet} from '../bottomSheet/BottomSheet';
 import {
   NavigationProp,
   useNavigation,
@@ -70,6 +71,7 @@ const customerDrawerItems: DrawerItem[] = [
 const workerDrawerItems: DrawerItem[] = [
   {label: 'Home', route: 'WorkerMain', icon: 'home'},
   {label: 'Attendance report', route: 'WorkerAttendanceReport', icon: 'clipboard'},
+  {label: 'Cash transactions', route: 'WorkerCashTransactions', icon: 'dollar-sign'},
   {label: 'My profile', route: 'WorkerProfile', icon: 'user'},
 ];
 
@@ -104,6 +106,7 @@ const screenTitles: Record<string, string> = {
   WorkerJobs: 'Assigned jobs',
   WorkerAttendance: 'My attendance',
   WorkerAttendanceReport: 'Attendance report',
+  WorkerCashTransactions: 'Cash transactions',
   WorkerProfile: 'Profile',
 };
 
@@ -144,7 +147,10 @@ export const MobileDrawerProvider = ({children}: PropsWithChildren) => {
     });
   };
   const resetWorkerStack = (
-    screenName: 'WorkerAttendanceReport' | 'WorkerProfile',
+    screenName:
+      | 'WorkerAttendanceReport'
+      | 'WorkerCashTransactions'
+      | 'WorkerProfile',
   ) => {
     const homeRoute = {
       name: 'WorkerMain' as const,
@@ -191,6 +197,9 @@ export const MobileDrawerProvider = ({children}: PropsWithChildren) => {
         break;
       case 'WorkerAttendanceReport':
         resetWorkerStack('WorkerAttendanceReport');
+        break;
+      case 'WorkerCashTransactions':
+        resetWorkerStack('WorkerCashTransactions');
         break;
       case 'WorkerMain':
         navigation.reset({
@@ -460,6 +469,67 @@ export const Card = ({
   <View style={[styles.card, style]}>{children}</View>
 );
 
+export const ListItemPressable = ({
+  accessibilityLabel,
+  onPress,
+  children,
+  style,
+}: PropsWithChildren<{
+  accessibilityLabel: string;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+}>) => (
+  <Pressable
+    accessibilityRole="button"
+    accessibilityLabel={accessibilityLabel}
+    onPress={onPress}
+    style={({pressed}) => [
+      styles.listItemPressable,
+      pressed && styles.listItemPressed,
+      style,
+    ]}>
+    {children}
+  </Pressable>
+);
+
+export const DetailsSheet = ({
+  visible,
+  setVisible,
+  title,
+  children,
+}: PropsWithChildren<{
+  visible: boolean;
+  setVisible: (visible: boolean) => void;
+  title: string;
+}>) => {
+  if (!visible) return null;
+  return (
+    <BottomSheet visible setVisible={setVisible}>
+      <View style={styles.detailsSheet}>
+        <View style={styles.detailsSheetHeader}>
+          <Text style={styles.detailsSheetTitle} numberOfLines={2}>
+            {title}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close details"
+            onPress={() => setVisible(false)}
+            style={styles.detailsSheetClose}>
+            <Feather name="x" size={19} color={palette.ink} />
+          </Pressable>
+        </View>
+        <ScrollView
+          style={styles.detailsSheetScroll}
+          contentContainerStyle={styles.detailsSheetContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          {children}
+        </ScrollView>
+      </View>
+    </BottomSheet>
+  );
+};
+
 export const colors = palette;
 
 const styles = StyleSheet.create({
@@ -493,7 +563,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.paleBlue,
   },
   avatarText: {fontSize: 12, fontWeight: '800', color: palette.primaryDark},
-  page: {padding: 16, paddingBottom: 28, gap: 14},
+  page: {padding: 14, paddingBottom: 24, gap: 11},
   titleBlock: {gap: 6, marginBottom: 1},
   titleBlockCompact: {gap: 0, marginBottom: -3},
   title: {fontSize: 23, fontWeight: '800', letterSpacing: -0.4, color: palette.ink},
@@ -569,7 +639,7 @@ const styles = StyleSheet.create({
   },
   signOutText: {fontSize: 14, fontWeight: '700', color: palette.danger},
   input: {
-    minHeight: 50,
+    minHeight: 46,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: 12,
@@ -580,7 +650,7 @@ const styles = StyleSheet.create({
   },
   multiline: {minHeight: 88, paddingTop: 12, textAlignVertical: 'top'},
   button: {
-    minHeight: 50,
+    minHeight: 44,
     borderRadius: 12,
     backgroundColor: palette.primary,
     alignItems: 'center',
@@ -595,10 +665,10 @@ const styles = StyleSheet.create({
   buttonDanger: {backgroundColor: palette.danger},
   buttonDisabled: {opacity: 0.5},
   buttonPressed: {opacity: 0.82},
-  buttonText: {color: palette.surface, fontSize: 15, fontWeight: '700'},
+  buttonText: {color: palette.surface, fontSize: 14, fontWeight: '700'},
   buttonSecondaryText: {color: palette.ink},
   message: {
-    padding: 12,
+    padding: 10,
     borderRadius: 10,
     backgroundColor: palette.paleBlue,
   },
@@ -608,7 +678,7 @@ const styles = StyleSheet.create({
   messageErrorText: {color: palette.danger},
   messageSuccessText: {color: palette.success},
   loading: {
-    minHeight: 64,
+    minHeight: 52,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -617,15 +687,49 @@ const styles = StyleSheet.create({
   muted: {color: palette.muted, fontSize: 14},
   card: {
     backgroundColor: palette.surface,
-    borderRadius: 16,
-    padding: 17,
+    borderRadius: 14,
+    padding: 13,
     borderWidth: 1,
     borderColor: palette.border,
-    gap: 12,
+    gap: 9,
     shadowColor: '#173044',
     shadowOffset: {width: 0, height: 3},
     shadowOpacity: 0.045,
     shadowRadius: 8,
     elevation: 2,
   },
+  listItemPressable: {borderRadius: 16},
+  listItemPressed: {opacity: 0.78, transform: [{scale: 0.99}]},
+  detailsSheet: {
+    maxHeight: '92%',
+    minHeight: 180,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backgroundColor: palette.white,
+  },
+  detailsSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  detailsSheetTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '800',
+    color: palette.ink,
+  },
+  detailsSheetClose: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: palette.canvas,
+  },
+  detailsSheetScroll: {flexShrink: 1},
+  detailsSheetContent: {gap: 12, paddingBottom: 8},
 });

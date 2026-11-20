@@ -13,8 +13,10 @@ import {
   ActionButton,
   Card,
   colors,
+  DetailsSheet,
   InfoMessage,
   LoadingMessage,
+  ListItemPressable,
   Page,
   PageTitle,
   TextField,
@@ -99,6 +101,9 @@ const CustomerAssetsScreen = ({route}: Props) => {
         ? 'flat'
         : 'car';
   const [formVisible, setFormVisible] = useState(false);
+  const [selectedSociety, setSelectedSociety] = useState<Society | null>(null);
+  const [selectedFlat, setSelectedFlat] = useState<Flat | null>(null);
+  const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [societyForm, setSocietyForm] = useState(societyDefaults);
   const [flatForm, setFlatForm] = useState(flatDefaults);
   const [carForm, setCarForm] = useState(carDefaults);
@@ -112,9 +117,11 @@ const CustomerAssetsScreen = ({route}: Props) => {
 
   const currentUser = useAppSelector(state => state.auth.user);
   const societyQuery = useGetMySocietiesQuery();
-  const flatQuery = useGetMyFlatsQuery();
-  const carQuery = useGetMyCarsQuery();
-  const profileQuery = useGetCustomerProfileQuery();
+  const flatQuery = useGetMyFlatsQuery(undefined, {skip: section === 'society'});
+  const carQuery = useGetMyCarsQuery(undefined, {skip: section !== 'car'});
+  const profileQuery = useGetCustomerProfileQuery(undefined, {
+    skip: section !== 'car',
+  });
   const societies = societyQuery.data?.data ?? [];
   const flats = flatQuery.data?.data ?? [];
   const cars = carQuery.data?.data ?? [];
@@ -134,9 +141,8 @@ const CustomerAssetsScreen = ({route}: Props) => {
   const [uploadImage] = useUploadImageMutation();
   const isLoading =
     societyQuery.isLoading ||
-    flatQuery.isLoading ||
-    carQuery.isLoading ||
-    profileQuery.isLoading;
+    (section !== 'society' && flatQuery.isLoading) ||
+    (section === 'car' && (carQuery.isLoading || profileQuery.isLoading));
 
   const submitSociety = async () => {
     setError('');
@@ -310,6 +316,7 @@ const CustomerAssetsScreen = ({route}: Props) => {
   };
 
   const startFlatEdit = (flat: Flat) => {
+    setSelectedFlat(null);
     setFormVisible(true);
     setEditingFlat(flat._id);
     setFlatForm({
@@ -327,6 +334,7 @@ const CustomerAssetsScreen = ({route}: Props) => {
   };
 
   const startCarEdit = (car: Car) => {
+    setSelectedCar(null);
     setFormVisible(true);
     setEditingCar(car._id);
     setCarForm({
@@ -389,7 +397,9 @@ const CustomerAssetsScreen = ({route}: Props) => {
         }
       />
       {isLoading ? <LoadingMessage text="Loading your registrations..." /> : null}
-      {societyQuery.isError || flatQuery.isError || carQuery.isError ? (
+      {societyQuery.isError ||
+      (section !== 'society' && flatQuery.isError) ||
+      (section === 'car' && (carQuery.isError || profileQuery.isError)) ? (
         <View style={styles.list}>
           <InfoMessage
             text="Some registration data could not be loaded. Please retry."
@@ -400,9 +410,11 @@ const CustomerAssetsScreen = ({route}: Props) => {
             variant="secondary"
             onPress={() => {
               societyQuery.refetch();
-              flatQuery.refetch();
-              carQuery.refetch();
-              profileQuery.refetch();
+              if (section !== 'society') flatQuery.refetch();
+              if (section === 'car') {
+                carQuery.refetch();
+                profileQuery.refetch();
+              }
             }}
           />
         </View>
@@ -414,7 +426,7 @@ const CustomerAssetsScreen = ({route}: Props) => {
         <>
           <ListHeading title="Registered societies" count={societies.length} />
           <View style={styles.list}>
-            {societies.length ? societies.map(society => <SocietyCard key={society._id} society={society} />) : (
+            {societies.length ? societies.map(society => <SocietyCard key={society._id} society={society} onPress={() => setSelectedSociety(society)} />) : (
               <EmptyRegistration
                 icon="home"
                 title="No society registered"
@@ -445,7 +457,7 @@ const CustomerAssetsScreen = ({route}: Props) => {
           <ListHeading title="Registered flats" count={flats.length} />
           <View style={styles.list}>
             {flats.length ? flats.map(flat => (
-              <FlatCard key={flat._id} flat={flat} onEdit={() => startFlatEdit(flat)} onDelete={() => removeFlat(flat)} busy={flatDeleteMutation.isLoading} />
+              <FlatCard key={flat._id} flat={flat} onPress={() => setSelectedFlat(flat)} onEdit={() => startFlatEdit(flat)} onDelete={() => removeFlat(flat)} busy={flatDeleteMutation.isLoading} />
             )) : (
               <EmptyRegistration
                 icon="grid"
@@ -533,7 +545,7 @@ const CustomerAssetsScreen = ({route}: Props) => {
           <ListHeading title="Registered cars" count={cars.length} />
           <View style={styles.list}>
             {cars.length ? cars.map(car => (
-              <CarCard key={car._id} car={car} onEdit={() => startCarEdit(car)} onDelete={() => removeCar(car)} busy={carDeleteMutation.isLoading} />
+              <CarCard key={car._id} car={car} onPress={() => setSelectedCar(car)} onEdit={() => startCarEdit(car)} onDelete={() => removeCar(car)} busy={carDeleteMutation.isLoading} />
             )) : (
               <EmptyRegistration
                 icon="truck"
@@ -544,6 +556,66 @@ const CustomerAssetsScreen = ({route}: Props) => {
           </View>
         </>
       ) : null}
+      <DetailsSheet
+        visible={Boolean(selectedSociety)}
+        setVisible={visible => !visible && setSelectedSociety(null)}
+        title={selectedSociety?.name || 'Society details'}>
+        {selectedSociety ? (
+          <>
+            <AssetDetail title="Status" value={selectedSociety.status} />
+            <AssetDetail
+              title="Address"
+              value={[selectedSociety.address, selectedSociety.city, selectedSociety.state, selectedSociety.pincode].filter(Boolean).join(', ')}
+            />
+            <AssetDetail title="Contact person" value={selectedSociety.contactPerson} />
+            <AssetDetail title="Phone" value={selectedSociety.phone} />
+            <AssetDetail title="Email" value={selectedSociety.email} />
+            <AssetDetail title="Description" value={selectedSociety.description} />
+            <AssetDetail title="Admin note" value={selectedSociety.verificationNote} />
+          </>
+        ) : null}
+      </DetailsSheet>
+      <DetailsSheet
+        visible={Boolean(selectedFlat)}
+        setVisible={visible => !visible && setSelectedFlat(null)}
+        title={selectedFlat ? `${selectedFlat.block ? `${selectedFlat.block} · ` : ''}${selectedFlat.flatNumber}` : 'Flat details'}>
+        {selectedFlat ? (
+          <>
+            <AssetDetail title="Society" value={label(selectedFlat.societyId)} />
+            <AssetDetail title="Verification" value={selectedFlat.verificationStatus} />
+            <AssetDetail title="Type" value={selectedFlat.flatType} />
+            <AssetDetail title="Floor" value={selectedFlat.floorNumber?.toString()} />
+            <AssetDetail title="Area" value={selectedFlat.area ? `${selectedFlat.area} sq. ft.` : undefined} />
+            <AssetDetail title="Occupancy" value={selectedFlat.status} />
+            <AssetDetail title="Description" value={selectedFlat.description} />
+            <AssetDetail title="Admin note" value={selectedFlat.verificationNote} />
+          </>
+        ) : null}
+      </DetailsSheet>
+      <DetailsSheet
+        visible={Boolean(selectedCar)}
+        setVisible={visible => !visible && setSelectedCar(null)}
+        title={selectedCar?.registrationNumber || 'Car details'}>
+        {selectedCar ? (
+          <>
+            {selectedCar.imageUrl ? (
+              <Image source={{uri: selectedCar.imageUrl}} style={styles.carImagePreview} />
+            ) : null}
+            <AssetDetail title="Vehicle" value={`${selectedCar.make} ${selectedCar.model}`} />
+            <AssetDetail title="Verification" value={selectedCar.verificationStatus} />
+            <AssetDetail title="Type and color" value={`${selectedCar.carType} · ${selectedCar.color}`} />
+            <AssetDetail title="Society" value={label(selectedCar.societyId)} />
+            <AssetDetail title="Flat" value={label(selectedCar.flatId)} />
+            <AssetDetail title="Parking slot" value={selectedCar.parkingSlot} />
+            <AssetDetail title="Vehicle status" value={selectedCar.status} />
+            <AssetDetail title="Owner" value={selectedCar.ownerName} />
+            <AssetDetail title="Phone" value={selectedCar.ownerPhone} />
+            <AssetDetail title="Email" value={selectedCar.ownerEmail} />
+            <AssetDetail title="Description" value={selectedCar.description} />
+            <AssetDetail title="Admin note" value={selectedCar.verificationNote} />
+          </>
+        ) : null}
+      </DetailsSheet>
     </Page>
   );
 };
@@ -635,47 +707,108 @@ const Status = ({value}: {value: string}) => (
   </Text>
 );
 
-const SocietyCard = ({society}: {society: Society}) => (
+const SocietyCard = ({society, onPress}: {society: Society; onPress: () => void}) => (
   <Card>
-    <View style={styles.cardHeader}>
-      <Text style={styles.cardTitle}>{society.name}</Text>
-      <Status value={society.status || 'PENDING'} />
-    </View>
-    <Text style={styles.detail}>{society.address}, {society.city}{society.state ? `, ${society.state}` : ''}</Text>
-    {society.verificationNote ? <Text style={styles.note}>Admin note: {society.verificationNote}</Text> : null}
+    <ListItemPressable accessibilityLabel={`View ${society.name} details`} onPress={onPress} style={styles.assetSummary}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{society.name}</Text>
+        <Status value={society.status || 'PENDING'} />
+      </View>
+      <Text style={styles.detail} numberOfLines={2}>
+        {society.address}, {society.city}{society.state ? `, ${society.state}` : ''}
+      </Text>
+      {society.verificationNote ? <Text style={styles.note} numberOfLines={2}>Admin note: {society.verificationNote}</Text> : null}
+      <View style={styles.viewDetails}>
+        <Text style={styles.viewDetailsText}>View full details</Text>
+        <Feather name="chevron-right" size={16} color={colors.primary} />
+      </View>
+    </ListItemPressable>
   </Card>
 );
 
-const FlatCard = ({flat, onEdit, onDelete, busy}: {flat: Flat; onEdit: () => void; onDelete: () => void; busy: boolean}) => (
+const FlatCard = ({flat, onPress, onEdit, onDelete, busy}: {flat: Flat; onPress: () => void; onEdit: () => void; onDelete: () => void; busy: boolean}) => (
   <Card>
-    <View style={styles.cardHeader}>
-      <Text style={styles.cardTitle}>{flat.block ? `${flat.block} · ` : ''}{flat.flatNumber}</Text>
-      <Status value={flat.verificationStatus || 'PENDING'} />
-    </View>
-    <Text style={styles.detail}>{label(flat.societyId)} · {flat.flatType || 'Flat'}</Text>
-    {flat.verificationNote ? <Text style={styles.note}>Admin note: {flat.verificationNote}</Text> : null}
+    <ListItemPressable accessibilityLabel={`View flat ${flat.flatNumber} details`} onPress={onPress} style={styles.assetSummary}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {flat.block ? `${flat.block} · ` : ''}{flat.flatNumber}
+        </Text>
+        <Status value={flat.verificationStatus || 'PENDING'} />
+      </View>
+      <Text style={styles.detail} numberOfLines={1}>
+        {label(flat.societyId)} · {flat.flatType || 'Flat'}
+      </Text>
+      {flat.verificationNote ? <Text style={styles.note} numberOfLines={2}>Admin note: {flat.verificationNote}</Text> : null}
+      <View style={styles.viewDetails}>
+        <Text style={styles.viewDetailsText}>View full details</Text>
+        <Feather name="chevron-right" size={16} color={colors.primary} />
+      </View>
+    </ListItemPressable>
     <View style={styles.actions}>
-      <ActionButton title="Edit" variant="secondary" onPress={onEdit} style={styles.action} />
-      <ActionButton title="Delete" variant="danger" onPress={onDelete} disabled={busy} style={styles.action} />
+      <IconAction icon="edit-2" label="Edit flat" onPress={onEdit} />
+      <IconAction icon="trash-2" label="Delete flat" onPress={onDelete} disabled={busy} danger />
     </View>
   </Card>
 );
 
-const CarCard = ({car, onEdit, onDelete, busy}: {car: Car; onEdit: () => void; onDelete: () => void; busy: boolean}) => (
+const CarCard = ({car, onPress, onEdit, onDelete, busy}: {car: Car; onPress: () => void; onEdit: () => void; onDelete: () => void; busy: boolean}) => (
   <Card>
-    {car.imageUrl ? <Image source={{uri: car.imageUrl}} style={styles.carImage} /> : null}
-    <View style={styles.cardHeader}>
-      <Text style={styles.cardTitle}>{car.registrationNumber}</Text>
-      <Status value={car.verificationStatus || 'PENDING'} />
-    </View>
-    <Text style={styles.detail}>{car.make} {car.model} · {car.color} · {car.carType}</Text>
-    <Text style={styles.detail}>{label(car.societyId)} · {label(car.flatId)}</Text>
-    {car.verificationNote ? <Text style={styles.note}>Admin note: {car.verificationNote}</Text> : null}
+    <ListItemPressable accessibilityLabel={`View ${car.registrationNumber} details`} onPress={onPress} style={styles.assetSummary}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{car.registrationNumber}</Text>
+        <Status value={car.verificationStatus || 'PENDING'} />
+      </View>
+      <Text style={styles.detail} numberOfLines={1}>{car.make} {car.model} · {car.carType}</Text>
+      <Text style={styles.detail} numberOfLines={1}>{label(car.societyId)} · {label(car.flatId)}</Text>
+      {car.verificationNote ? <Text style={styles.note} numberOfLines={2}>Admin note: {car.verificationNote}</Text> : null}
+      <View style={styles.viewDetails}>
+        <Text style={styles.viewDetailsText}>View full details</Text>
+        <Feather name="chevron-right" size={16} color={colors.primary} />
+      </View>
+    </ListItemPressable>
     <View style={styles.actions}>
-      <ActionButton title="Edit" variant="secondary" onPress={onEdit} style={styles.action} />
-      <ActionButton title="Delete" variant="danger" onPress={onDelete} disabled={busy} style={styles.action} />
+      <IconAction icon="edit-2" label="Edit car" onPress={onEdit} />
+      <IconAction icon="trash-2" label="Delete car" onPress={onDelete} disabled={busy} danger />
     </View>
   </Card>
+);
+
+const AssetDetail = ({title, value}: {title: string; value?: string}) => (
+  <View style={styles.assetDetail}>
+    <Text style={styles.assetDetailLabel}>{title}</Text>
+    <Text style={styles.assetDetailValue}>{value || '—'}</Text>
+  </View>
+);
+
+const IconAction = ({
+  icon,
+  label,
+  onPress,
+  disabled = false,
+  danger = false,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) => (
+  <Pressable
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    disabled={disabled}
+    onPress={onPress}
+    style={[
+      styles.iconAction,
+      danger && styles.iconActionDanger,
+      disabled && styles.iconActionDisabled,
+    ]}>
+    <Feather
+      name={icon}
+      size={17}
+      color={danger ? colors.danger : colors.primary}
+    />
+  </Pressable>
 );
 
 const label = (value: RelatedEntity) => {
@@ -746,6 +879,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paleBlue,
   },
   cardHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8},
+  assetSummary: {gap: 8},
+  viewDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 40,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: 6,
+  },
+  viewDetailsText: {fontSize: 12, fontWeight: '700', color: colors.primary},
+  assetDetail: {
+    gap: 3,
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  assetDetailLabel: {fontSize: 11, fontWeight: '600', color: colors.muted},
+  assetDetailValue: {fontSize: 14, lineHeight: 20, color: colors.ink},
   cardTitle: {fontSize: 16, fontWeight: '800', color: colors.ink, flexShrink: 1},
   detail: {fontSize: 13, lineHeight: 19, color: colors.muted},
   note: {fontSize: 13, color: colors.danger},
@@ -760,9 +912,17 @@ const styles = StyleSheet.create({
   choiceText: {fontSize: 13, color: colors.ink},
   choiceTextSelected: {fontWeight: '700', color: colors.primaryDark},
   emptyChoice: {fontSize: 13, color: colors.muted},
-  actions: {flexDirection: 'row', gap: 8},
-  action: {flex: 1},
-  carImage: {width: '100%', height: 132, borderRadius: 10, backgroundColor: colors.canvas},
+  actions: {flexDirection: 'row', justifyContent: 'flex-end', gap: 6},
+  iconAction: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: colors.paleBlue,
+  },
+  iconActionDanger: {backgroundColor: '#FDECEA'},
+  iconActionDisabled: {opacity: 0.45},
   carImagePreview: {width: '100%', height: 160, borderRadius: 12, backgroundColor: colors.canvas},
 });
 

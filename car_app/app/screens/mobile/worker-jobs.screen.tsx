@@ -2,7 +2,6 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
   Image,
-  Modal,
   PermissionsAndroid,
   Platform,
   Pressable,
@@ -19,8 +18,10 @@ import {
   ActionButton,
   Card,
   colors,
+  DetailsSheet,
   InfoMessage,
   LoadingMessage,
+  ListItemPressable,
   Page,
   PageTitle,
   TextField,
@@ -561,18 +562,23 @@ const JobCard = ({
 
   return (
     <Card>
-      <View style={styles.row}>
-        <Text style={styles.title}>
-          {job.serviceNameSnapshot || 'Car wash'}
+      <ListItemPressable
+        accessibilityLabel={`View ${job.serviceNameSnapshot || 'job'} details`}
+        onPress={() => setTimelineExpanded(true)}
+        style={styles.jobSummary}>
+        <View style={styles.row}>
+          <Text style={styles.title}>
+            {job.serviceNameSnapshot || 'Car wash'}
+          </Text>
+          <Text style={styles.status} numberOfLines={1}>{job.status}</Text>
+        </View>
+        <Text style={styles.copy} numberOfLines={1}>{car || 'Car details unavailable'}</Text>
+        {location ? <Text style={styles.copy} numberOfLines={1}>{location}</Text> : null}
+        <Text style={styles.copy} numberOfLines={1}>
+          {new Date(job.bookingDate).toLocaleDateString()} · {job.bookingTime}
         </Text>
-        <Text style={styles.status}>{job.status}</Text>
-      </View>
-      <Text style={styles.copy}>{car || 'Car details unavailable'}</Text>
-      {location ? <Text style={styles.copy}>{location}</Text> : null}
-      <Text style={styles.copy}>
-        {new Date(job.bookingDate).toLocaleDateString()} · {job.bookingTime}
-      </Text>
-      <Text style={styles.workStatus}>Work: {workStatus}</Text>
+        <Text style={styles.workStatus}>Work: {workStatus}</Text>
+      </ListItemPressable>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{expanded: timelineExpanded}}
@@ -581,15 +587,10 @@ const JobCard = ({
         <Text style={styles.timelineToggleText}>Manage job</Text>
         <Feather name="chevron-right" size={17} color={colors.primary} />
       </Pressable>
-      <Modal
+      <DetailsSheet
         visible={timelineExpanded}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setTimelineExpanded(false)}>
-        <View style={styles.modalOverlay}>
-          <Card style={styles.detailsModal}>
-            <ScrollView contentContainerStyle={styles.detailsModalContent}>
-              <Text style={styles.modalTitle}>Job details & progress</Text>
+        setVisible={setTimelineExpanded}
+        title="Job details & progress">
               <Text style={styles.copy}>Times shown in India time</Text>
               {actionError ? (
                 <InfoMessage text={actionError} variant="error" />
@@ -597,7 +598,6 @@ const JobCard = ({
               <View style={styles.timeline}>
           <View style={styles.detailsSection}>
             <Text style={styles.sectionTitle}>Booking details</Text>
-            <DetailRow title="Booking ID" value={job._id} />
             <DetailRow title="Service" value={job.serviceNameSnapshot || 'Car wash'} />
             <DetailRow
               title="Scheduled"
@@ -863,15 +863,7 @@ const JobCard = ({
           ) : null}
           {isFinal ? <Text style={styles.copy}>This job is closed.</Text> : null}
               </View>
-              <ActionButton
-                title="Close"
-                variant="secondary"
-                onPress={() => setTimelineExpanded(false)}
-              />
-            </ScrollView>
-          </Card>
-        </View>
-      </Modal>
+      </DetailsSheet>
 
     </Card>
   );
@@ -896,14 +888,14 @@ const DetailRow = ({title, value}: {title: string; value: string}) => (
 
 const styles = StyleSheet.create({
   list: {},
-  row: {flexDirection: 'row', justifyContent: 'space-between'},
+  row: {flexDirection: 'row', justifyContent: 'space-between', gap: 8},
   title: {fontSize: 15, fontWeight: '800', color: colors.ink, flexShrink: 1},
-  status: {marginLeft: 8, fontSize: 12, fontWeight: '700', color: colors.primary},
+  status: {maxWidth: '32%', marginLeft: 4, fontSize: 11, fontWeight: '700', color: colors.primary, textAlign: 'right'},
   copy: {fontSize: 13, lineHeight: 19, color: colors.muted},
   workStatus: {fontSize: 13, color: colors.ink, fontWeight: '700'},
   progressSection: {gap: 8},
   manageButton: {
-    minHeight: 36,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -911,15 +903,8 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingTop: 8,
   },
+  jobSummary: {gap: 6},
   timelineToggleText: {fontSize: 13, fontWeight: '700', color: colors.primary},
-  modalOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)'},
-  detailsModal: {
-    maxHeight: '92%',
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  detailsModalContent: {gap: 10, paddingBottom: 8},
-  modalTitle: {fontSize: 18, fontWeight: '800', color: colors.ink},
   timeline: {gap: 10, borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 12},
   detailsSection: {gap: 6, paddingBottom: 8},
   sectionTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},

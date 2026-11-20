@@ -23,6 +23,51 @@ export type TWorkerPayload = {
   address?: string;
 };
 
+export type WorkerCashTransaction = {
+  _id: string;
+  bookingId?: {
+    _id: string;
+    bookingDate: string;
+    bookingTime: string;
+    serviceNameSnapshot: string;
+    status: string;
+    paymentType?: string;
+    paymentMethod?: string;
+    carId?: {
+      registrationNumber?: string;
+      make?: string;
+      model?: string;
+    };
+  };
+  customerId?: { name?: string; email?: string; phone?: string };
+  amount: number;
+  currency: string;
+  provider: "Cash";
+  status: "Pending" | "Paid" | "Failed" | "Refunded";
+  reference?: string;
+  refundReference?: string;
+  refundReason?: string;
+  createdAt: string;
+  verifiedAt?: string;
+  refundedAt?: string;
+};
+
+export type WorkerCashTransactions = {
+  data: WorkerCashTransaction[];
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    summary?: {
+      transactionCount: number;
+      paidCount: number;
+      paidAmount: number;
+      refundedAmount: number;
+    };
+  };
+};
+
 export interface TWorkerListParams {
   search?: string;
   status?: TWorkerStatus | "";
@@ -264,7 +309,7 @@ updateWorkerBookingWorkAction: builder.mutation<
     method: "PATCH",
     body: { action, ...(cashReceived === undefined ? {} : { cashReceived }) },
   }),
-  invalidatesTags: ["Worker"],
+  invalidatesTags: ["Worker", "PaymentTransactions"],
 }),
 updateWorkerBookingProgress: builder.mutation<
   unknown,
@@ -307,6 +352,22 @@ updateWorkerBookingProgress: builder.mutation<
       query: () => ({ url: "/workers/attendance/me" }),
       transformResponse: (response) => unwrapNullable<WorkerAttendance>(response),
       providesTags: ["Attendance"],
+    }),
+    getMyCashTransactions: builder.query<
+      WorkerCashTransactions,
+      {
+        page?: number;
+        limit?: number;
+        status?: "Pending" | "Paid" | "Failed" | "Refunded";
+        from?: string;
+        to?: string;
+      } | void
+    >({
+      query: (params) => ({
+        url: "/workers/cash-transactions",
+        params: params ?? {},
+      }),
+      providesTags: ["PaymentTransactions"],
     }),
     getMyAttendanceHistory: builder.query<
       WorkerAttendanceHistory,
@@ -357,6 +418,7 @@ export const {
   useUpdateWorkerBookingProgressMutation,
   useGetMyAttendanceQuery,
   useGetMyAttendanceHistoryQuery,
+  useGetMyCashTransactionsQuery,
   usePunchAttendanceMutation,
   useGetDailyAttendanceReportQuery
 } = workerApi;

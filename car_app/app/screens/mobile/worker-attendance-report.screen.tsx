@@ -1,16 +1,19 @@
 import React, {useState} from 'react';
-import {RefreshControl, StyleSheet, Text, View} from 'react-native';
+import {Image, RefreshControl, StyleSheet, Text, View} from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
   Card,
   colors,
+  DetailsSheet,
   InfoMessage,
   LoadingMessage,
+  ListItemPressable,
   Page,
   PageTitle,
 } from '../../components/mobile/ui';
 import {useGetMyAttendanceHistoryQuery} from '../../store/worker.api';
+import {WorkerAttendance} from '../../store/types';
 
 const formatDate = (value: string) =>
   new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', {
@@ -29,6 +32,7 @@ const formatTime = (value?: string | null) =>
 
 const WorkerAttendanceReportScreen = () => {
   const [limit, setLimit] = useState(10);
+  const [selectedRecord, setSelectedRecord] = useState<WorkerAttendance | null>(null);
   const {data, isLoading, isError, isFetching, refetch} =
     useGetMyAttendanceHistoryQuery({page: 1, limit});
   const report = data?.data;
@@ -58,7 +62,11 @@ const WorkerAttendanceReportScreen = () => {
       ) : report?.records.length ? (
         <>
           {report.records.map(record => (
-            <Card key={record._id} style={styles.recordCard}>
+            <ListItemPressable
+              key={record._id}
+              accessibilityLabel={`View attendance for ${formatDate(record.dateKey)}`}
+              onPress={() => setSelectedRecord(record)}>
+            <Card style={styles.recordCard}>
               <View style={styles.header}>
                 <View style={styles.recordDate}>
                   <View style={styles.dateIcon}>
@@ -79,16 +87,21 @@ const WorkerAttendanceReportScreen = () => {
                 </Text>
               </View>
               <View style={styles.row}>
-                <View style={styles.timeCard}>
-                  <Text style={styles.label}>Punch in</Text>
+                <View style={styles.timeValue}>
+                  <Text style={styles.label}>In</Text>
                   <Text style={styles.time}>{formatTime(record.punchInAt)}</Text>
                 </View>
-                <View style={styles.timeCard}>
-                  <Text style={styles.label}>Punch out</Text>
+                <View style={styles.timeValue}>
+                  <Text style={styles.label}>Out</Text>
                   <Text style={styles.time}>{formatTime(record.punchOutAt)}</Text>
                 </View>
               </View>
+              <View style={styles.itemFooter}>
+                <Text style={styles.itemFooterText}>View full details</Text>
+                <Feather name="chevron-right" size={16} color={colors.primary} />
+              </View>
             </Card>
+            </ListItemPressable>
           ))}
           {report.meta.total > report.records.length ? (
             <ActionButton
@@ -110,12 +123,51 @@ const WorkerAttendanceReportScreen = () => {
           </Text>
         </Card>
       )}
+      <DetailsSheet
+        visible={Boolean(selectedRecord)}
+        setVisible={visible => !visible && setSelectedRecord(null)}
+        title="Attendance details">
+        {selectedRecord ? (
+          <>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Date</Text>
+              <Text style={styles.detailValue}>{formatDate(selectedRecord.dateKey)}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Punch in</Text>
+              <Text style={styles.detailValue}>{formatTime(selectedRecord.punchInAt)}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Punch out</Text>
+              <Text style={styles.detailValue}>{formatTime(selectedRecord.punchOutAt)}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Status</Text>
+              <Text style={styles.detailValue}>
+                {selectedRecord.punchOutAt ? 'Complete' : 'In progress'}
+              </Text>
+            </View>
+            <View style={styles.selfies}>
+              <View style={styles.selfieColumn}>
+                <Text style={styles.label}>Punch-in selfie</Text>
+                <Image source={{uri: selectedRecord.punchInSelfie}} style={styles.selfie} />
+              </View>
+              {selectedRecord.punchOutSelfie ? (
+                <View style={styles.selfieColumn}>
+                  <Text style={styles.label}>Punch-out selfie</Text>
+                  <Image source={{uri: selectedRecord.punchOutSelfie}} style={styles.selfie} />
+                </View>
+              ) : null}
+            </View>
+          </>
+        ) : null}
+      </DetailsSheet>
     </Page>
   );
 };
 
 const styles = StyleSheet.create({
-  recordCard: {gap: 13, borderRadius: 18},
+  recordCard: {gap: 9, borderRadius: 14, paddingVertical: 11},
   recordDate: {flexDirection: 'row', alignItems: 'center', gap: 9},
   dateIcon: {
     width: 32,
@@ -125,7 +177,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.paleBlue,
   },
-  heading: {fontSize: 16, fontWeight: '800', color: colors.ink},
+  heading: {fontSize: 14, fontWeight: '800', color: colors.ink},
   copy: {fontSize: 13, lineHeight: 19, color: colors.muted},
   header: {
     flexDirection: 'row',
@@ -143,18 +195,30 @@ const styles = StyleSheet.create({
   },
   complete: {backgroundColor: '#E8F5EE', color: colors.success},
   inProgress: {backgroundColor: '#FFF4E5', color: '#A15C00'},
-  row: {flexDirection: 'row', gap: 10},
-  timeCard: {
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 8,
+  },
+  timeValue: {
     flex: 1,
-    borderRadius: 14,
-    padding: 13,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.canvas,
-    gap: 6,
+    gap: 2,
   },
   label: {fontSize: 11, fontWeight: '600', color: colors.muted},
-  time: {fontSize: 16, fontWeight: '800', color: colors.ink},
+  time: {fontSize: 14, fontWeight: '800', color: colors.ink},
+  itemFooter: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: 7,
+  },
+  itemFooterText: {fontSize: 12, fontWeight: '700', color: colors.primary},
   emptyCard: {alignItems: 'flex-start', gap: 10, borderRadius: 18},
   emptyIcon: {
     width: 42,
@@ -164,6 +228,19 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.paleBlue,
   },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  detailLabel: {flex: 1, fontSize: 12, color: colors.muted},
+  detailValue: {flex: 1, textAlign: 'right', fontSize: 13, color: colors.ink, fontWeight: '600'},
+  selfies: {flexDirection: 'row', gap: 10},
+  selfieColumn: {flex: 1, gap: 5},
+  selfie: {width: '100%', height: 150, borderRadius: 10, backgroundColor: colors.canvas},
 });
 
 export default WorkerAttendanceReportScreen;

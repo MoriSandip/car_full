@@ -17,8 +17,10 @@ import {
   ActionButton,
   Card,
   colors,
+  DetailsSheet,
   InfoMessage,
   LoadingMessage,
+  ListItemPressable,
   Page,
   PageTitle,
   TextField,
@@ -206,8 +208,12 @@ const CustomerMembershipsScreen = () => {
                 />
               </View>
               <View style={styles.carOptionCopy}>
-                <Text style={styles.carOptionTitle}>{labelOf(car)}</Text>
-                <Text style={styles.carOptionHint}>Verified vehicle</Text>
+                <Text style={styles.carOptionTitle} numberOfLines={1}>
+                  {labelOf(car)}
+                </Text>
+                <Text style={styles.carOptionHint} numberOfLines={1}>
+                  Verified vehicle
+                </Text>
               </View>
               <Feather
                 name={carId === car._id ? 'check-circle' : 'circle'}
@@ -262,7 +268,8 @@ const CustomerMembershipsScreen = () => {
                     style={[
                       styles.offerText,
                       offerId === offer._id && styles.offerTextSelected,
-                    ]}>
+                    ]}
+                    numberOfLines={2}>
                     {offer.title} · {offer.discountValue}
                     {offer.discountType === 'Percentage' ? '%' : ' off'}
                   </Text>
@@ -366,7 +373,7 @@ const PlanOption = ({
     style={[styles.planOption, selected && styles.selectedPlan]}>
     <View style={styles.planCopy}>
       <Text style={styles.cardTitle}>{plan.name}</Text>
-      <Text style={styles.body}>
+      <Text style={styles.body} numberOfLines={2}>
         {plan.includedWashes} washes · {plan.validityDays} days
         {plan.description ? ` · ${plan.description}` : ''}
       </Text>
@@ -390,6 +397,9 @@ const MembershipHistoryCard = ({
   paymentError: string;
 }) => {
   const [detailsVisible, setDetailsVisible] = useState(false);
+  const [selectedWash, setSelectedWash] = useState<
+    NonNullable<Membership['washHistory']>[number] | null
+  >(null);
   const remainingWashes =
     membership.remainingWashes ??
     Math.max(
@@ -405,8 +415,7 @@ const MembershipHistoryCard = ({
 
   return (
     <>
-      <Pressable
-        accessibilityRole="button"
+      <ListItemPressable
         accessibilityLabel={`View ${membership.planNameSnapshot || 'membership'} details`}
         onPress={() => setDetailsVisible(true)}>
         <Card style={styles.membershipCard}>
@@ -428,13 +437,14 @@ const MembershipHistoryCard = ({
           </View>
           <View style={styles.membershipSummary}>
             <Text style={styles.membershipAmount}>₹{membership.totalAmount}</Text>
-            <Text style={styles.body}>
+            <Text style={[styles.body, styles.membershipRemaining]} numberOfLines={1}>
               {remainingWashes} washes left ·{' '}
               {new Date(membership.endDate).toLocaleDateString()}
             </Text>
+            <Feather name="chevron-right" size={17} color={colors.muted} />
           </View>
         </Card>
-      </Pressable>
+      </ListItemPressable>
       <BottomSheet visible={detailsVisible} setVisible={setDetailsVisible}>
         <View style={styles.formSheet}>
           <View style={styles.formSheetHeader}>
@@ -494,20 +504,29 @@ const MembershipHistoryCard = ({
             <Text style={styles.sectionTitle}>Daily wash history</Text>
             {membership.washHistory?.length ? (
               membership.washHistory.map(wash => (
-                <Card key={wash._id} style={styles.historyRow}>
-                  <Text style={styles.body}>
-                    {new Date(wash.bookingDate).toLocaleDateString()} at{' '}
-                    {wash.bookingTime} · {wash.serviceNameSnapshot}
-                  </Text>
-                  <Text style={styles.body}>
-                    {wash.status} / {wash.workStatus || 'Not started'}
-                    {wash.workCompletedAt
-                      ? ` · Completed ${new Date(
-                          wash.workCompletedAt,
-                        ).toLocaleString()}`
-                      : ''}
-                  </Text>
-                </Card>
+                <ListItemPressable
+                  key={wash._id}
+                  accessibilityLabel={`View ${wash.serviceNameSnapshot} wash details`}
+                  onPress={() => setSelectedWash(wash)}>
+                  <Card style={styles.historyRow}>
+                    <Text style={styles.body}>
+                      {new Date(wash.bookingDate).toLocaleDateString()} at{' '}
+                      {wash.bookingTime} · {wash.serviceNameSnapshot}
+                    </Text>
+                    <Text style={styles.body}>
+                      {wash.status} / {wash.workStatus || 'Not started'}
+                      {wash.workCompletedAt
+                        ? ` · Completed ${new Date(
+                            wash.workCompletedAt,
+                          ).toLocaleString()}`
+                        : ''}
+                    </Text>
+                    <View style={styles.washItemFooter}>
+                        <Text style={styles.washItemFooterText}>View wash details</Text>
+                        <Feather name="chevron-right" size={16} color={colors.primary} />
+                    </View>
+                  </Card>
+                </ListItemPressable>
               ))
             ) : (
               <Text style={styles.body}>No daily washes scheduled yet.</Text>
@@ -515,9 +534,50 @@ const MembershipHistoryCard = ({
           </ScrollView>
         </View>
       </BottomSheet>
+      <DetailsSheet
+        visible={Boolean(selectedWash)}
+        setVisible={visible => !visible && setSelectedWash(null)}
+        title="Wash details">
+        {selectedWash ? (
+          <>
+            <MembershipDetail
+              title="Service"
+              value={selectedWash.serviceNameSnapshot}
+            />
+            <MembershipDetail
+              title="Scheduled"
+              value={`${new Date(selectedWash.bookingDate).toLocaleDateString()} · ${selectedWash.bookingTime}`}
+            />
+            <MembershipDetail title="Booking status" value={selectedWash.status} />
+            <MembershipDetail
+              title="Work status"
+              value={selectedWash.workStatus || 'Not started'}
+            />
+            <MembershipDetail
+              title="Completed"
+              value={
+                selectedWash.workCompletedAt
+                  ? new Date(selectedWash.workCompletedAt).toLocaleString()
+                  : 'Not completed'
+              }
+            />
+            <MembershipDetail
+              title="Total work time"
+              value={`${Math.floor((selectedWash.totalWorkingSeconds || 0) / 60)} min`}
+            />
+          </>
+        ) : null}
+      </DetailsSheet>
     </>
   );
 };
+
+const MembershipDetail = ({title, value}: {title: string; value?: string}) => (
+  <View style={styles.washDetail}>
+    <Text style={styles.washDetailLabel}>{title}</Text>
+    <Text style={styles.washDetailValue}>{value || '—'}</Text>
+  </View>
+);
 
 const styles = StyleSheet.create({
   addButton: {
@@ -593,6 +653,7 @@ const styles = StyleSheet.create({
   carOptionTitle: {fontSize: 13, fontWeight: '700', color: colors.ink},
   carOptionHint: {fontSize: 11, color: colors.muted},
   offerOption: {
+    maxWidth: '100%',
     minHeight: 39,
     flexDirection: 'row',
     alignItems: 'center',
@@ -605,7 +666,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   offerOptionSelected: {borderColor: colors.primary, backgroundColor: colors.paleBlue},
-  offerText: {fontSize: 12, fontWeight: '600', color: colors.muted},
+  offerText: {flexShrink: 1, fontSize: 12, fontWeight: '600', color: colors.muted},
   offerTextSelected: {color: colors.primaryDark},
   cardTitle: {fontSize: 15, fontWeight: '700', color: colors.ink},
   body: {fontSize: 13, lineHeight: 19, color: colors.muted},
@@ -617,6 +678,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  membershipRemaining: {flex: 1, textAlign: 'right'},
   historyHeading: {flexDirection: 'row', alignItems: 'center', gap: 8},
   membershipCount: {
     minWidth: 22,
@@ -657,6 +719,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paleBlue,
   },
   historyRow: {gap: 3, paddingVertical: 12},
+  washItemFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: 6,
+  },
+  washItemFooterText: {fontSize: 12, fontWeight: '700', color: colors.primary},
+  washDetail: {gap: 3, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border},
+  washDetailLabel: {fontSize: 11, fontWeight: '600', color: colors.muted},
+  washDetailValue: {fontSize: 14, lineHeight: 20, color: colors.ink},
   planOption: {
     minHeight: 62,
     flexDirection: 'row',

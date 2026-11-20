@@ -1,14 +1,17 @@
-import React from 'react';
-import {Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
+import React, {useState} from 'react';
+import {Image, Pressable, RefreshControl, StyleSheet, Text, View} from 'react-native';
 import {
   Card,
   colors,
+  DetailsSheet,
   InfoMessage,
   LoadingMessage,
+  ListItemPressable,
   Page,
 } from '../../components/mobile/ui';
 import {useGetWorkerDashboardQuery} from '../../store/worker.api';
 import {useAppSelector} from '../../store/hooks';
+import {Booking} from '../../store/types';
 import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import {NavigatorParamList} from '../../navigators/navigation-route';
 import Feather from 'react-native-vector-icons/Feather';
@@ -17,6 +20,7 @@ type Props = BottomTabScreenProps<NavigatorParamList, 'WorkerDashboard'>;
 
 const WorkerHomeScreen = ({navigation}: Props) => {
   const user = useAppSelector(state => state.auth.user);
+  const [selectedJob, setSelectedJob] = useState<Booking | null>(null);
   const {data, isLoading, isError, refetch, isFetching} =
     useGetWorkerDashboardQuery();
   const dashboard = data?.data;
@@ -127,7 +131,11 @@ const WorkerHomeScreen = ({navigation}: Props) => {
                 month: 'short',
               });
           return (
-            <Card key={job._id} style={styles.jobCard}>
+            <ListItemPressable
+              key={job._id}
+              accessibilityLabel={`View ${job.serviceNameSnapshot || 'job'} details`}
+              onPress={() => setSelectedJob(job)}>
+            <Card style={styles.jobCard}>
               <View style={styles.jobCardHeader}>
                 <View style={styles.jobIcon}>
                   <Feather name="droplet" size={18} color={colors.primary} />
@@ -141,7 +149,7 @@ const WorkerHomeScreen = ({navigation}: Props) => {
                   </Text>
                 </View>
                 <View style={styles.statusBadge}>
-                  <Text style={styles.status}>
+                  <Text style={styles.status} numberOfLines={1}>
                     {job.workStatus || job.status}
                   </Text>
                 </View>
@@ -162,7 +170,12 @@ const WorkerHomeScreen = ({navigation}: Props) => {
                   ₹{Number(job.amountPayable ?? 0).toLocaleString('en-IN')}
                 </Text>
               </View>
+              <View style={styles.listItemFooter}>
+                <Text style={styles.listItemFooterText}>View job details</Text>
+                <Feather name="chevron-right" size={16} color={colors.primary} />
+              </View>
             </Card>
+            </ListItemPressable>
           );
         })
       ) : !isLoading && !isError ? (
@@ -176,9 +189,93 @@ const WorkerHomeScreen = ({navigation}: Props) => {
           </Text>
         </Card>
       ) : null}
+      <DetailsSheet
+        visible={Boolean(selectedJob)}
+        setVisible={visible => !visible && setSelectedJob(null)}
+        title="Assignment details">
+        {selectedJob ? (
+          <>
+            <WorkerDetail title="Service" value={selectedJob.serviceNameSnapshot || 'Car wash'} />
+            <WorkerDetail
+              title="Vehicle"
+              value={entityLabel(selectedJob.carId) || 'Car details unavailable'}
+            />
+            <WorkerDetail
+              title="Location"
+              value={[entityLabel(selectedJob.societyId), entityLabel(selectedJob.flatId)]
+                .filter(Boolean)
+                .join(' · ') || 'Location unavailable'}
+            />
+            <WorkerDetail
+              title="Scheduled"
+              value={`${new Date(selectedJob.bookingDate).toLocaleDateString('en-IN')} · ${selectedJob.bookingTime}`}
+            />
+            <WorkerDetail title="Booking status" value={selectedJob.status} />
+            <WorkerDetail title="Work status" value={selectedJob.workStatus || 'Not started'} />
+            <WorkerDetail title="Payment type" value={selectedJob.paymentType || '—'} />
+            <WorkerDetail
+              title="Payment method / status"
+              value={`${selectedJob.paymentMethod || '—'} · ${selectedJob.paymentStatus || '—'}`}
+            />
+            <WorkerDetail
+              title="Cash collection"
+              value={selectedJob.cashCollectionStatus || '—'}
+            />
+            <WorkerDetail
+              title="Amount"
+              value={`₹${Number(selectedJob.amountPayable || 0).toFixed(2)}`}
+            />
+            <WorkerDetail title="Booking note" value={selectedJob.remarks} />
+            <WorkerDetail title="Worker notes" value={selectedJob.workerNotes} />
+            <Text style={styles.detailSection}>Cleaning checklist</Text>
+            {[
+              {label: 'Exterior wash', checked: selectedJob.cleaningChecklist?.exteriorWash},
+              {label: 'Interior cleaning', checked: selectedJob.cleaningChecklist?.interiorCleaning},
+              {label: 'Dashboard', checked: selectedJob.cleaningChecklist?.dashboard},
+              {label: 'Tyre dressing', checked: selectedJob.cleaningChecklist?.tyreDressing},
+              {label: 'Vacuum cleaning', checked: selectedJob.cleaningChecklist?.vacuumCleaning},
+            ].map(({label, checked}) => (
+              <WorkerDetail
+                key={label}
+                title={label}
+                value={checked ? 'Done' : 'Pending'}
+              />
+            ))}
+            {selectedJob.workSessions?.length ? (
+              <>
+                <Text style={styles.detailSection}>Work timeline</Text>
+                {selectedJob.workSessions.map((session, index) => (
+                  <WorkerDetail
+                    key={`${session.startedAt}-${index}`}
+                    title={index === 0 ? 'Work started' : 'Work resumed'}
+                    value={`${new Date(session.startedAt).toLocaleString('en-IN')}${session.endedAt ? ` – ${new Date(session.endedAt).toLocaleString('en-IN')}` : ' · Active'}`}
+                  />
+                ))}
+              </>
+            ) : null}
+            {selectedJob.beforePhoto || selectedJob.afterPhoto ? (
+              <View style={styles.photoRow}>
+                {selectedJob.beforePhoto ? (
+                  <Image source={{uri: selectedJob.beforePhoto}} style={styles.photo} />
+                ) : null}
+                {selectedJob.afterPhoto ? (
+                  <Image source={{uri: selectedJob.afterPhoto}} style={styles.photo} />
+                ) : null}
+              </View>
+            ) : null}
+          </>
+        ) : null}
+      </DetailsSheet>
     </Page>
   );
 };
+
+const WorkerDetail = ({title, value}: {title: string; value?: string}) => (
+  <View style={styles.detailRow}>
+    <Text style={styles.detailLabel}>{title}</Text>
+    <Text style={styles.detailValue}>{value || '—'}</Text>
+  </View>
+);
 
 const statTints = {
   teal: {background: '#E4F3F2', foreground: '#087F8C'},
@@ -353,7 +450,7 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: colors.paleBlue,
   },
-  jobHeading: {flex: 1, gap: 4},
+  jobHeading: {flex: 1, minWidth: 0, gap: 4},
   jobTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
   jobDate: {fontSize: 11, fontWeight: '600', color: colors.muted},
   statusBadge: {
@@ -373,7 +470,30 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   jobAmount: {fontSize: 13, fontWeight: '800', color: colors.ink},
-  copy: {flex: 1, fontSize: 12, color: colors.muted, lineHeight: 17},
+  listItemFooter: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: 7,
+  },
+  listItemFooterText: {fontSize: 12, fontWeight: '700', color: colors.primary},
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  detailLabel: {flex: 1, fontSize: 12, color: colors.muted},
+  detailValue: {flex: 1, textAlign: 'right', fontSize: 13, color: colors.ink, fontWeight: '600'},
+  detailSection: {fontSize: 14, fontWeight: '800', color: colors.ink, marginTop: 4},
+  photoRow: {flexDirection: 'row', gap: 8},
+  photo: {flex: 1, height: 130, borderRadius: 10, backgroundColor: colors.canvas},
+  copy: {flex: 1, minWidth: 0, fontSize: 12, color: colors.muted, lineHeight: 17},
   emptyCard: {alignItems: 'flex-start', borderRadius: 18},
   emptyIcon: {
     width: 40,

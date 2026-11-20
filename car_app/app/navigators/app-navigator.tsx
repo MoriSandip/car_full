@@ -28,6 +28,7 @@ import WorkerHomeScreen from '../screens/mobile/worker-home.screen';
 import WorkerJobsScreen from '../screens/mobile/worker-jobs.screen';
 import WorkerAttendanceScreen from '../screens/mobile/worker-attendance.screen';
 import WorkerAttendanceReportScreen from '../screens/mobile/worker-attendance-report.screen';
+import WorkerCashTransactionsScreen from '../screens/mobile/worker-cash-transactions.screen';
 import ProfileScreen from '../screens/mobile/profile.screen';
 import ApiRequestUi from '../components/mobile/api-request-ui';
 import PaymentReturnHandler from '../components/mobile/payment-return-handler';
@@ -157,6 +158,10 @@ const WorkerFlow = () => (
     <Stack.Screen
       name="WorkerAttendanceReport"
       component={WorkerAttendanceReportScreen}
+    />
+    <Stack.Screen
+      name="WorkerCashTransactions"
+      component={WorkerCashTransactionsScreen}
     />
     <Stack.Screen name="WorkerProfile" component={ProfileScreen} />
   </Stack.Navigator>

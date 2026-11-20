@@ -51,6 +51,7 @@ export type NavigatorParamList = {
   ['WorkerJobs']: undefined;
   ['WorkerAttendance']: undefined;
   ['WorkerAttendanceReport']: undefined;
+  ['WorkerCashTransactions']: undefined;
   ['WorkerProfile']: undefined;
 };
 

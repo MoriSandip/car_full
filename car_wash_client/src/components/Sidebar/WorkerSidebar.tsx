@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
+  Banknote,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
@@ -53,6 +54,11 @@ const navGroups = [
         title: "My Attendance Report",
         href: "/worker/attendance/report",
         icon: ClipboardCheck,
+      },
+      {
+        title: "Cash Transactions",
+        href: "/worker/cash-transactions",
+        icon: Banknote,
       },
     ],
   },

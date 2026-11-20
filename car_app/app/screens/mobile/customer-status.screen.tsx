@@ -1,21 +1,19 @@
 import React, {useMemo, useState} from 'react';
 import {
   Image,
-  Modal,
-  Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import {
-  ActionButton,
   Card,
   colors,
+  DetailsSheet,
   InfoMessage,
   LoadingMessage,
+  ListItemPressable,
   Page,
   PageTitle,
 } from '../../components/mobile/ui';
@@ -158,36 +156,37 @@ const CustomerStatusScreen = () => {
       ) : bookings.length ? (
         <View style={styles.list}>
           {bookings.map(booking => (
-            <Card key={booking._id} style={styles.bookingCard}>
-              <View style={styles.row}>
-                {typeof booking.carId !== 'string' && booking.carId.imageUrl ? (
-                  <Image
-                    source={{uri: booking.carId.imageUrl}}
-                    style={styles.carImage}
-                  />
-                ) : null}
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>
-                    {booking.serviceNameSnapshot || 'Car wash'}
-                  </Text>
-                  <Text style={styles.body}>
-                    {labelOf(booking.carId)} · {formatDate(booking.bookingDate)} at{' '}
-                    {booking.bookingTime}
+            <ListItemPressable
+              key={booking._id}
+              accessibilityLabel={`View ${booking.serviceNameSnapshot || 'cleaning task'} details`}
+              onPress={() => setSelectedBooking(booking)}>
+              <Card style={styles.bookingCard}>
+                <View style={styles.row}>
+                  {typeof booking.carId !== 'string' && booking.carId.imageUrl ? (
+                    <Image
+                      source={{uri: booking.carId.imageUrl}}
+                      style={styles.carImage}
+                    />
+                  ) : null}
+                  <View style={styles.flex}>
+                    <Text style={styles.cardTitle} numberOfLines={1}>
+                      {booking.serviceNameSnapshot || 'Car wash'}
+                    </Text>
+                    <Text style={styles.body} numberOfLines={1}>
+                      {labelOf(booking.carId)} · {formatDate(booking.bookingDate)} ·{' '}
+                      {booking.bookingTime}
+                    </Text>
+                  </View>
+                  <Text style={[styles.badge, statusColor(booking)]} numberOfLines={1}>
+                    {workStatus(booking)}
                   </Text>
                 </View>
-                <Text style={[styles.badge, statusColor(booking)]}>
-                  {workStatus(booking)}
-                </Text>
-              </View>
-              <Text style={styles.body}>
-                Booking: {booking.status} · {booking.paymentType}
-              </Text>
-              <ActionButton
-                title="View task details"
-                variant="secondary"
-                onPress={() => setSelectedBooking(booking)}
-              />
-            </Card>
+                <View style={styles.detailButton}>
+                  <Text style={styles.detailButtonText}>View full details</Text>
+                  <Feather name="chevron-right" size={17} color={colors.primary} />
+                </View>
+              </Card>
+            </ListItemPressable>
           ))}
         </View>
       ) : (
@@ -203,30 +202,12 @@ const CustomerStatusScreen = () => {
         </Card>
       )}
 
-      <Modal
+      <DetailsSheet
         visible={Boolean(selectedBooking)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedBooking(null)}>
-        <View style={styles.modalBackdrop}>
-          <Card style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={styles.flex}>
-                <Text style={styles.cardTitle}>Cleaning task details</Text>
-                <Text style={styles.body}>
-                  Worker updates and times are shown in India time.
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close task details"
-                onPress={() => setSelectedBooking(null)}
-                style={styles.closeButton}>
-                <Text style={styles.closeText}>×</Text>
-              </Pressable>
-            </View>
+        setVisible={visible => !visible && setSelectedBooking(null)}
+        title="Cleaning task details">
             {selectedBooking ? (
-              <ScrollView contentContainerStyle={styles.modalContent}>
+              <>
                 <View style={styles.detailGrid}>
                   <Detail title="Service" value={selectedBooking.serviceNameSnapshot} />
                   <Detail title="Car" value={labelOf(selectedBooking.carId)} />
@@ -301,11 +282,9 @@ const CustomerStatusScreen = () => {
                   <Photo title="Before cleaning" uri={selectedBooking.beforePhoto} />
                   <Photo title="After cleaning" uri={selectedBooking.afterPhoto} />
                 </View>
-              </ScrollView>
+              </>
             ) : null}
-          </Card>
-        </View>
-      </Modal>
+      </DetailsSheet>
     </Page>
   );
 };
@@ -367,11 +346,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   list: {gap: 10},
-  bookingCard: {gap: 11, borderRadius: 18},
-  row: {flexDirection: 'row', alignItems: 'flex-start', gap: 8},
+  bookingCard: {gap: 8, borderRadius: 14, paddingVertical: 11},
+  row: {flexDirection: 'row', alignItems: 'center', gap: 8},
   carImage: {width: 62, height: 48, borderRadius: 8, backgroundColor: colors.canvas},
-  flex: {flex: 1},
-  cardTitle: {fontSize: 15, fontWeight: '800', color: colors.ink},
+  flex: {flex: 1, minWidth: 0},
+  cardTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
   body: {fontSize: 13, lineHeight: 19, color: colors.muted},
   emptyCard: {alignItems: 'flex-start', gap: 11, borderRadius: 18},
   emptyIcon: {
@@ -383,40 +362,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paleBlue,
   },
   badge: {
+    maxWidth: '34%',
     overflow: 'hidden',
     borderRadius: 16,
     paddingHorizontal: 9,
     paddingVertical: 5,
     fontSize: 11,
     fontWeight: '700',
+    textAlign: 'center',
   },
   inProgress: {backgroundColor: '#E8F1FF', color: '#175CD3'},
   paused: {backgroundColor: '#F4EBFF', color: '#6941C6'},
   completed: {backgroundColor: '#ECFDF3', color: '#027A48'},
   cancelled: {backgroundColor: '#FEF3F2', color: '#B42318'},
   notStarted: {backgroundColor: '#FFFAEB', color: '#B54708'},
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(16, 35, 52, 0.55)',
-  },
-  modalCard: {
-    maxHeight: '92%',
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    gap: 14,
-  },
-  modalHeader: {flexDirection: 'row', alignItems: 'flex-start', gap: 10},
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.canvas,
+  detailButton: {
+    minHeight: 44,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 6,
   },
-  closeText: {fontSize: 25, lineHeight: 28, color: colors.ink},
-  modalContent: {gap: 12, paddingBottom: 8},
+  detailButtonText: {fontSize: 13, fontWeight: '700', color: colors.primary},
   detailGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

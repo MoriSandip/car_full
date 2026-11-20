@@ -118,6 +118,10 @@ const routeMetadata: Record<string, { title: string; description: string }> = {
     title: "Attendance Report | Ultimate Car Wash",
     description: "Review your worker attendance history.",
   },
+  "/worker/cash-transactions": {
+    title: "Cash Transactions | Ultimate Car Wash",
+    description: "Review cash transactions recorded by you as a worker.",
+  },
   "/customer": {
     title: "Customer Dashboard | Ultimate Car Wash",
     description: "Manage your car wash account and bookings.",

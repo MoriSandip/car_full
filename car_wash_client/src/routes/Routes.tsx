@@ -40,6 +40,7 @@ import PaymentTransactions from "@/pages/Dashboard/Payments/PaymentTransactions"
 import CashCollections from "@/pages/Dashboard/Payments/CashCollections";
 import WorkerAttendance from "@/pages/WorkerDashboard/Attendance/WorkerAttendance";
 import WorkerAttendanceReport from "@/pages/WorkerDashboard/Attendance/WorkerAttendanceReport";
+import WorkerCashTransactions from "@/pages/WorkerDashboard/CashTransactions/WorkerCashTransactions";
 import EditServicePage from "@/pages/Dashboard/AllService/EditServicePage";
 import RouteMetadata from "@/components/RouteMetadata";
 
@@ -200,6 +201,10 @@ const routes = createBrowserRouter([
       {
         path: "/worker/attendance/report",
         element: <WorkerAttendanceReport />,
+      },
+      {
+        path: "/worker/cash-transactions",
+        element: <WorkerCashTransactions />,
       },
     ],
   },

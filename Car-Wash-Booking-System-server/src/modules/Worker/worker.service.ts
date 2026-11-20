@@ -309,6 +309,79 @@ const getAssignedBookingsFromDB = async (
     data,
   };
 };
+
+const getMyCashTransactionsFromDB = async (
+  workerId: string,
+  filters: {
+    page?: number;
+    limit?: number;
+    status?: 'Pending' | 'Paid' | 'Failed' | 'Refunded';
+    from?: string;
+    to?: string;
+  },
+) => {
+  if (!Types.ObjectId.isValid(workerId)) {
+    throw new AppError(400, 'Invalid worker ID');
+  }
+  const page = Math.max(1, Math.floor(Number(filters.page) || 1));
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(filters.limit) || 20)));
+  const query: Record<string, unknown> = {
+    provider: 'Cash',
+    recordedByWorker: new Types.ObjectId(workerId),
+  };
+  if (filters.status) query.status = filters.status;
+  const createdAt: Record<string, Date> = {};
+  if (filters.from) {
+    createdAt.$gte = new Date(`${filters.from}T00:00:00.000Z`);
+  }
+  if (filters.to) {
+    const endDate = new Date(`${filters.to}T00:00:00.000Z`);
+    endDate.setUTCDate(endDate.getUTCDate() + 1);
+    createdAt.$lt = endDate;
+  }
+  if (Object.keys(createdAt).length) query.createdAt = createdAt;
+
+  const [data, total, totals] = await Promise.all([
+    PaymentTransaction.find(query)
+      .populate({
+        path: 'bookingId',
+        select: 'bookingDate bookingTime serviceNameSnapshot status paymentType paymentMethod carId',
+        populate: {path: 'carId', select: 'registrationNumber make model'},
+      })
+      .populate('customerId', 'name email phone')
+      .sort({createdAt: -1})
+      .skip((page - 1) * limit)
+      .limit(limit),
+    PaymentTransaction.countDocuments(query),
+    PaymentTransaction.aggregate([
+      {$match: query},
+      {
+        $group: {
+          _id: null,
+          transactionCount: {$sum: 1},
+          paidCount: {$sum: {$cond: [{$eq: ['$status', 'Paid']}, 1, 0]}},
+          paidAmount: {
+            $sum: {$cond: [{$eq: ['$status', 'Paid']}, '$amount', 0]},
+          },
+          refundedAmount: {
+            $sum: {$cond: [{$eq: ['$status', 'Refunded']}, '$amount', 0]},
+          },
+        },
+      },
+    ]),
+  ]);
+  return {
+    data,
+    summary: totals[0] ?? {
+      transactionCount: 0,
+      paidCount: 0,
+      paidAmount: 0,
+      refundedAmount: 0,
+    },
+    meta: {page, limit, total, totalPages: Math.ceil(total / limit)},
+  };
+};
+
 type TWorkAction = "start" | "stop" | "resume" | "done";
 type TCleaningProgress = {
   beforePhoto?: string;
@@ -742,6 +815,7 @@ export const WorkerServices = {
   workerLoginFromDB,
   getWorkerDashboard,
   getAssignedBookingsFromDB,
+  getMyCashTransactionsFromDB,
   updateAssignedBookingProgress,
   updateAssignedBookingWork
 };

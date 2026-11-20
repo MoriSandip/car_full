@@ -175,6 +175,37 @@ const getAssignedBookings = catchAsync(async (req, res) => {
   });
 });
 
+const getMyCashTransactions = catchAsync(async (req, res) => {
+  const workerId = (req as any).worker?._id ?? (req as any).user?.sub;
+  if (!workerId) {
+    return sendResponse(res, {
+      statusCode: httpStatus.UNAUTHORIZED,
+      success: false,
+      message: 'Authenticated worker ID not found',
+      data: null,
+    });
+  }
+  const result = await WorkerServices.getMyCashTransactionsFromDB(
+    String(workerId),
+    {
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 20,
+      status: req.query.status
+        ? String(req.query.status) as 'Pending' | 'Paid' | 'Failed' | 'Refunded'
+        : undefined,
+      from: req.query.from ? String(req.query.from) : undefined,
+      to: req.query.to ? String(req.query.to) : undefined,
+    },
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Your cash transactions were retrieved successfully',
+    data: result.data,
+    meta: {...result.meta, summary: result.summary},
+  });
+});
+
 
 const updateAssignedBookingWork = catchAsync(async (req, res) => {
   const workerId = (req as any).worker?._id;
@@ -244,6 +275,7 @@ export const WorkerControllers = {
   getMyProfile,
   getWorkerDashboard,
   getAssignedBookings,
+  getMyCashTransactions,
   updateAssignedBookingWork,
   updateAssignedBookingProgress,
 };

@@ -148,17 +148,17 @@ const WorkerAttendanceScreen = () => {
               </View>
             </View>
             <View style={styles.row}>
-              <View style={styles.timeCard}>
+              <View style={styles.timeValue}>
                 <View style={styles.timeLabel}>
                   <Feather name="log-in" size={14} color={colors.primary} />
-                  <Text style={styles.label}>Punch in</Text>
+                  <Text style={styles.label}>In</Text>
                 </View>
                 <Text style={styles.time}>{formatTime(attendance?.punchInAt)}</Text>
               </View>
-              <View style={styles.timeCard}>
+              <View style={styles.timeValue}>
                 <View style={styles.timeLabel}>
                   <Feather name="log-out" size={14} color={colors.muted} />
-                  <Text style={styles.label}>Punch out</Text>
+                  <Text style={styles.label}>Out</Text>
                 </View>
                 <Text style={styles.time}>{formatTime(attendance?.punchOutAt)}</Text>
               </View>
@@ -224,8 +224,8 @@ const WorkerAttendanceScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  shiftCard: {gap: 15, borderRadius: 18},
-  selfieCard: {gap: 13, borderRadius: 18},
+  shiftCard: {gap: 11, borderRadius: 14},
+  selfieCard: {gap: 11, borderRadius: 14},
   cardHeading: {flexDirection: 'row', alignItems: 'center', gap: 10},
   cardIcon: {
     width: 34,
@@ -236,17 +236,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paleBlue,
   },
   cardHeadingCopy: {flex: 1, gap: 3},
-  heading: {fontSize: 17, fontWeight: '800', color: colors.ink},
+  heading: {fontSize: 15, fontWeight: '800', color: colors.ink},
   copy: {fontSize: 13, lineHeight: 19, color: colors.muted},
-  row: {flexDirection: 'row', gap: 10},
-  timeCard: {
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 9,
+  },
+  timeValue: {
     flex: 1,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.canvas,
-    gap: 6,
+    gap: 3,
   },
   timeLabel: {flexDirection: 'row', alignItems: 'center', gap: 6},
   label: {fontSize: 11, fontWeight: '600', color: colors.muted},

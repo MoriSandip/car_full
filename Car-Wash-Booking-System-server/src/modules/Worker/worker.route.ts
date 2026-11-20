@@ -30,6 +30,12 @@ router.get(
   WorkerControllers.getAssignedBookings,
 );
 router.get(
+  '/cash-transactions',
+  auth('WORKER'),
+  validateRequest(WorkerValidation.cashTransactionListValidationSchema),
+  WorkerControllers.getMyCashTransactions,
+);
+router.get(
   '/me',
   auth('WORKER'),
   WorkerControllers.getMyProfile,

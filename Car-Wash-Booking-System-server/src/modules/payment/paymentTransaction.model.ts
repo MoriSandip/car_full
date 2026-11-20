@@ -83,6 +83,7 @@ paymentTransactionSchema.pre('validate', function (next) {
 
 paymentTransactionSchema.index({ bookingId: 1, createdAt: -1 });
 paymentTransactionSchema.index({ membershipId: 1, createdAt: -1 });
+paymentTransactionSchema.index({ recordedByWorker: 1, provider: 1, createdAt: -1 });
 
 export const PaymentTransaction = model<IPaymentTransaction>(
   'PaymentTransaction',
