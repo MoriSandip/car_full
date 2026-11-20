@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -11,11 +11,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import dayjs, {type Dayjs} from 'dayjs';
-import {
-  launchCamera,
-  launchImageLibrary,
-} from 'react-native-image-picker';
+import dayjs, { type Dayjs } from 'dayjs';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
@@ -35,7 +32,12 @@ import {
   usePerformWorkActionMutation,
   useUpdateCleaningProgressMutation,
 } from '../../store/worker.api';
-import {Booking} from '../../store/types';
+import {
+  describeImageAsset,
+  imageDataUrl,
+  photoPickerOptions,
+} from '../../utils/mobile-image';
+import { Booking } from '../../store/types';
 import {
   canPerformBookingWorkAction,
   canPerformWorkAction,
@@ -44,9 +46,11 @@ import {
 } from '../../store/worker-workflow';
 
 const errorMessage = (error: unknown) => {
-  const value = error as {data?: {message?: string}; message?: string};
+  const value = error as { data?: { message?: string }; message?: string };
   return value.data?.message || value.message || 'Unable to update this job.';
 };
+
+const SHEET_DISMISS_DELAY_MS = 350;
 
 const WorkerJobsScreen = () => {
   const [status, setStatus] = useState('All');
@@ -59,8 +63,9 @@ const WorkerJobsScreen = () => {
   );
   const monthDays = useMemo(
     () =>
-      Array.from({length: month.add(1, 'month').diff(month, 'day')}, (_, index) =>
-        month.add(index, 'day'),
+      Array.from(
+        { length: month.add(1, 'month').diff(month, 'day') },
+        (_, index) => month.add(index, 'day'),
       ),
     [month],
   );
@@ -73,23 +78,30 @@ const WorkerJobsScreen = () => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const {currentData: data, isLoading, isError, isFetching, refetch} =
-    useGetAssignedBookingsQuery({
+  const {
+    currentData: data,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useGetAssignedBookingsQuery(
+    {
       page: 1,
       limit: 100,
       from: month.format('YYYY-MM-DD'),
       toExclusive: month.add(1, 'month').format('YYYY-MM-DD'),
-    }, {
+    },
+    {
       pollingInterval: 30_000,
       refetchOnMountOrArgChange: true,
-    });
-  const attendanceQuery = useGetMyAttendanceQuery();
-  const attendance = attendanceQuery.data?.data ?? null;
-  const canUpdateWork =
-    !attendanceQuery.isLoading &&
-    !attendanceQuery.isFetching &&
-    !attendanceQuery.isError &&
-    canPerformWorkAction(attendance, 'start');
+    },
+  );
+  const {
+    data: attendanceResponse,
+    isLoading: attendanceLoading,
+    isFetching: attendanceFetching,
+    isError: attendanceError,
+  } = useGetMyAttendanceQuery();
   const [performAction, mutation] = usePerformWorkActionMutation();
   const [updateProgress, progressMutation] =
     useUpdateCleaningProgressMutation();
@@ -102,7 +114,10 @@ const WorkerJobsScreen = () => {
   const visibleJobs = useMemo(() => {
     const term = debouncedSearch.toLowerCase();
     return jobs.filter(job => {
-      if (status !== 'All' && job.status.toLowerCase() !== status.toLowerCase()) {
+      if (
+        status !== 'All' &&
+        job.status.toLowerCase() !== status.toLowerCase()
+      ) {
         return false;
       }
       if (!term) return true;
@@ -110,11 +125,7 @@ const WorkerJobsScreen = () => {
       const car =
         typeof job.carId === 'string'
           ? job.carId
-          : [
-              job.carId.registrationNumber,
-              job.carId.make,
-              job.carId.model,
-            ]
+          : [job.carId.registrationNumber, job.carId.make, job.carId.model]
               .filter(Boolean)
               .join(' ');
       const location = [label(job.societyId), label(job.flatId)].join(' ');
@@ -146,14 +157,14 @@ const WorkerJobsScreen = () => {
       return byDate || left.bookingTime.localeCompare(right.bookingTime);
     });
 
-    return sortedJobs.reduce<Array<{date: string; bookings: Booking[]}>>(
+    return sortedJobs.reduce<Array<{ date: string; bookings: Booking[] }>>(
       (groups, job) => {
         const date = dayjs(job.bookingDate).format('YYYY-MM-DD');
         const lastGroup = groups[groups.length - 1];
         if (lastGroup?.date === date) {
           lastGroup.bookings.push(job);
         } else {
-          groups.push({date, bookings: [job]});
+          groups.push({ date, bookings: [job] });
         }
         return groups;
       },
@@ -175,24 +186,11 @@ const WorkerJobsScreen = () => {
       );
       return;
     }
-    if (
-      !canUpdateWork ||
-      !canPerformWorkAction(attendance, action)
-    ) {
-      setActionError(
-        attendanceQuery.isError
-          ? 'Could not verify today’s attendance. Refresh attendance before updating job progress.'
-          : attendanceQuery.isLoading || attendanceQuery.isFetching
-            ? 'Attendance is still being verified. Try again shortly.'
-            : "Punch in for today's shift before updating job progress.",
-      );
-      return;
-    }
     try {
       await performAction({
         bookingId: booking._id,
         action,
-        ...(cashReceived === undefined ? {} : {cashReceived}),
+        ...(cashReceived === undefined ? {} : { cashReceived }),
       }).unwrap();
     } catch (error) {
       setActionError(errorMessage(error));
@@ -209,7 +207,7 @@ const WorkerJobsScreen = () => {
   ) => {
     try {
       setActionError('');
-      await updateProgress({bookingId, progress}).unwrap();
+      await updateProgress({ bookingId, progress }).unwrap();
     } catch (error) {
       setActionError(errorMessage(error));
     }
@@ -225,8 +223,10 @@ const WorkerJobsScreen = () => {
           }}
           tintColor={colors.primary}
         />
-      }>
-      <PageTitle compact
+      }
+    >
+      <PageTitle
+        compact
         title="Monthly schedule"
         subtitle="Assigned washes by date"
       />
@@ -239,7 +239,8 @@ const WorkerJobsScreen = () => {
             setMonth(previous);
             setSelectedDay(previous);
           }}
-          style={styles.monthArrow}>
+          style={styles.monthArrow}
+        >
           <Feather name="chevron-left" size={19} color={colors.ink} />
         </Pressable>
         <Text style={styles.monthLabel}>{month.format('MMMM YYYY')}</Text>
@@ -251,7 +252,8 @@ const WorkerJobsScreen = () => {
             setMonth(next);
             setSelectedDay(next);
           }}
-          style={styles.monthArrow}>
+          style={styles.monthArrow}
+        >
           <Feather name="chevron-right" size={19} color={colors.ink} />
         </Pressable>
       </View>
@@ -259,51 +261,51 @@ const WorkerJobsScreen = () => {
         <ScheduleStat title="Assigned" value={isLoading ? '—' : jobs.length} />
         <ScheduleStat title="Pending" value={isLoading ? '—' : pendingCount} />
         <ScheduleStat title="Done" value={isLoading ? '—' : completedCount} />
-        <ScheduleStat title="Cancelled" value={isLoading ? '—' : cancelledCount} />
+        <ScheduleStat
+          title="Cancelled"
+          value={isLoading ? '—' : cancelledCount}
+        />
       </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.days}
-        accessibilityLabel={`${month.format('MMMM YYYY')} booking dates`}>
+        accessibilityLabel={`${month.format('MMMM YYYY')} booking dates`}
+      >
         {monthDays.map(day => {
           const dayKey = day.format('YYYY-MM-DD');
           const count = jobs.filter(
             job => dayjs(job.bookingDate).format('YYYY-MM-DD') === dayKey,
           ).length;
-          const selected =
-            dayKey === selectedDay.format('YYYY-MM-DD');
+          const selected = dayKey === selectedDay.format('YYYY-MM-DD');
 
           return (
             <Pressable
               key={dayKey}
               accessibilityRole="button"
-              accessibilityState={{selected}}
+              accessibilityState={{ selected }}
               onPress={() => setSelectedDay(day)}
-              style={[styles.day, selected && styles.daySelected]}>
-              <Text style={[styles.dayName, selected && styles.dayTextSelected]}>
+              style={[styles.day, selected && styles.daySelected]}
+            >
+              <Text
+                style={[styles.dayName, selected && styles.dayTextSelected]}
+              >
                 {day.format('ddd')}
               </Text>
-              <Text style={[styles.dayNumber, selected && styles.dayTextSelected]}>
+              <Text
+                style={[styles.dayNumber, selected && styles.dayTextSelected]}
+              >
                 {day.format('D')}
               </Text>
-              <Text style={[styles.dayCount, selected && styles.dayTextSelected]}>
+              <Text
+                style={[styles.dayCount, selected && styles.dayTextSelected]}
+              >
                 {count ? `${count} ${count === 1 ? 'job' : 'jobs'}` : '—'}
               </Text>
             </Pressable>
           );
         })}
       </ScrollView>
-      {attendanceQuery.isError ? (
-        <InfoMessage
-          text="Could not verify today's attendance. Refresh attendance before updating job progress."
-          variant="error"
-        />
-      ) : attendanceQuery.isLoading || attendanceQuery.isFetching ? (
-        <LoadingMessage text="Verifying today's attendance..." />
-      ) : !canUpdateWork ? (
-        <InfoMessage text="Punch in for today's shift in the Punch tab before starting, pausing, resuming, or completing a job." />
-      ) : null}
       <TextField
         accessibilityLabel="Search assigned bookings"
         placeholder="Search by car, service, or booking status"
@@ -315,22 +317,33 @@ const WorkerJobsScreen = () => {
         <Text style={styles.filterHeadingText}>Filter assignments</Text>
       </View>
       <View style={styles.filters}>
-        {['All', 'Pending', 'Confirmed', 'InProgress', 'Completed', 'Cancelled'].map(value => (
+        {[
+          'All',
+          'Pending',
+          'Confirmed',
+          'InProgress',
+          'Completed',
+          'Cancelled',
+        ].map(value => (
           <Pressable
             key={value}
             accessibilityRole="button"
-            accessibilityState={{selected: status === value}}
+            accessibilityState={{ selected: status === value }}
             onPress={() => setStatus(value)}
-            style={[styles.filter, status === value && styles.filterSelected]}>
-            <Text style={[styles.filterText, status === value && styles.filterTextSelected]}>
+            style={[styles.filter, status === value && styles.filterSelected]}
+          >
+            <Text
+              style={[
+                styles.filterText,
+                status === value && styles.filterTextSelected,
+              ]}
+            >
               {value === 'InProgress' ? 'In progress' : value}
             </Text>
           </Pressable>
         ))}
       </View>
-      {actionError ? (
-        <InfoMessage text={actionError} variant="error" />
-      ) : null}
+      {actionError ? <InfoMessage text={actionError} variant="error" /> : null}
       {isLoading || (isFetching && !data) ? (
         <LoadingMessage text="Loading assignments..." />
       ) : isError ? (
@@ -348,22 +361,25 @@ const WorkerJobsScreen = () => {
           </Text>
           <Text style={styles.copy}>
             {jobs.length === 0
-              ? `Assigned washes for ${month.format('MMMM YYYY')} will appear here.`
+              ? `Assigned washes for ${month.format(
+                  'MMMM YYYY',
+                )} will appear here.`
               : 'Try a different search or status filter.'}
           </Text>
         </Card>
+      ) : selectedDayJobs.length === 0 ? (
+        <Card style={styles.emptyCard}>
+          <View style={styles.emptyIcon}>
+            <Feather name="calendar" size={19} color={colors.primary} />
+          </View>
+          <Text style={styles.title}>No jobs for this day</Text>
+          <Text style={styles.copy}>
+            No matching jobs are scheduled for{' '}
+            {selectedDay.format('D MMMM YYYY')}.
+          </Text>
+        </Card>
       ) : (
-        selectedDayJobs.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <View style={styles.emptyIcon}>
-              <Feather name="calendar" size={19} color={colors.primary} />
-            </View>
-            <Text style={styles.title}>No jobs for this day</Text>
-            <Text style={styles.copy}>
-              No matching jobs are scheduled for {selectedDay.format('D MMMM YYYY')}.
-            </Text>
-          </Card>
-        ) : <View style={styles.list}>
+        <View style={styles.list}>
           {groupedJobs.map(group => (
             <View key={group.date} style={styles.dayGroup}>
               <View style={styles.dayHeading}>
@@ -371,22 +387,46 @@ const WorkerJobsScreen = () => {
                   {dayjs(group.date).format('dddd, D MMMM')}
                 </Text>
                 <Text style={styles.copy}>
-                  {group.bookings.length} {group.bookings.length === 1 ? 'job' : 'jobs'}
+                  {group.bookings.length}{' '}
+                  {group.bookings.length === 1 ? 'job' : 'jobs'}
                 </Text>
               </View>
               {group.bookings.map(job => (
                 <JobCard
                   key={job._id}
                   job={job}
-                  disabled={mutation.isLoading || !canUpdateWork}
+                  disabled={mutation.isLoading}
                   now={now}
-                  onAction={(action, cashReceived) =>
-                    runAction(job, action, cashReceived)
-                  }
+                  onAction={(action, cashReceived) => {
+                    if (action === 'start') {
+                      if (attendanceLoading || attendanceFetching) {
+                        Alert.alert(
+                          'Checking punch-in status',
+                          'Please wait a moment, then try starting the task again.',
+                        );
+                        return;
+                      }
+                      if (attendanceError) {
+                        Alert.alert(
+                          'Attendance unavailable',
+                          'Your punch-in status could not be checked. Please try again.',
+                        );
+                        return;
+                      }
+                      if (
+                        !canPerformWorkAction(attendanceResponse?.data, 'start')
+                      ) {
+                        Alert.alert(
+                          'Punch-in required',
+                          'Please punch in from My Attendance before starting this task.',
+                        );
+                        return;
+                      }
+                    }
+                    runAction(job, action, cashReceived);
+                  }}
                   onProgress={progress => saveProgress(job._id, progress)}
-                  progressDisabled={
-                    progressMutation.isLoading || !canUpdateWork
-                  }
+                  progressDisabled={progressMutation.isLoading}
                   actionError={actionError}
                 />
               ))}
@@ -435,7 +475,18 @@ const JobCard = ({
 }) => {
   const [notes, setNotes] = useState(job.workerNotes || '');
   const [photoError, setPhotoError] = useState('');
+  const [photoPreviews, setPhotoPreviews] = useState<{
+    beforePhoto?: string;
+    afterPhoto?: string;
+  }>({});
+  const photoPickerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
+  useEffect(
+    () => () => {
+      if (photoPickerTimer.current) clearTimeout(photoPickerTimer.current);
+    },
+    [],
+  );
   const workStatus = job.workStatus || 'NotStarted';
   const isFinal = job.status === 'Completed' || job.status === 'Cancelled';
   const car =
@@ -445,8 +496,7 @@ const JobCard = ({
           job.carId.model || ''
         }`.trim();
   const carDetails = typeof job.carId === 'string' ? null : job.carId;
-  const customer =
-    typeof job.customerId === 'string' ? null : job.customerId;
+  const customer = typeof job.customerId === 'string' ? null : job.customerId;
   const location = [label(job.societyId), label(job.flatId)]
     .filter(Boolean)
     .join(' · ');
@@ -459,8 +509,7 @@ const JobCard = ({
     workStatus === 'Working' && !Number.isNaN(activeStartedAt)
       ? Math.max(0, Math.floor((now - activeStartedAt) / 1000))
       : 0;
-  const elapsedSeconds =
-    (job.totalWorkingSeconds ?? 0) + activeSeconds;
+  const elapsedSeconds = (job.totalWorkingSeconds ?? 0) + activeSeconds;
   const formatTimelineTime = (value?: string | null) => {
     if (!value) return '—';
     const date = new Date(value);
@@ -510,11 +559,13 @@ const JobCard = ({
     ) {
       Alert.alert(
         'Cash collection status',
-        `Was ₹${Number(job.amountPayable || 0).toFixed(2)} collected from the customer?`,
+        `Was ₹${Number(job.amountPayable || 0).toFixed(
+          2,
+        )} collected from the customer?`,
         [
-          {text: 'Cancel', style: 'cancel'},
-          {text: 'Not received', onPress: () => onAction('done', false)},
-          {text: 'Received', onPress: () => onAction('done', true)},
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Not received', onPress: () => onAction('done', false) },
+          { text: 'Received', onPress: () => onAction('done', true) },
         ],
       );
       return;
@@ -533,19 +584,13 @@ const JobCard = ({
           PermissionsAndroid.PERMISSIONS.CAMERA,
         );
         if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
-          setPhotoError('Camera permission is required to add cleaning photos.');
+          setPhotoError(
+            'Camera permission is required to add cleaning photos.',
+          );
           return;
         }
       }
-      const options = {
-        mediaType: 'photo' as const,
-        selectionLimit: 1,
-        quality: 0.5 as const,
-        maxWidth: 960,
-        maxHeight: 960,
-        includeBase64: true,
-        assetRepresentationMode: 'compatible' as const,
-      };
+      const options = photoPickerOptions(0.5, 960);
       const result =
         source === 'camera'
           ? await launchCamera({
@@ -556,15 +601,22 @@ const JobCard = ({
           : await launchImageLibrary(options);
       if (result.didCancel) return;
       if (result.errorCode || result.errorMessage) {
-        setPhotoError(result.errorMessage || 'Camera could not be opened.');
+        setPhotoError(
+          `Photo picker error (${result.errorCode || 'unknown'}): ${
+            result.errorMessage || 'No additional details were returned.'
+          }`,
+        );
         return;
       }
       const asset = result.assets?.[0];
-      if (!asset?.base64 || !asset.type?.match(/^image\/(jpeg|png|webp)$/)) {
-        setPhotoError('Could not read the photo. Please take another photo.');
+      if (!asset) {
+        setPhotoError(describeImageAsset());
         return;
       }
-      const photo = `data:${asset.type};base64,${asset.base64}`;
+      if (asset.uri) {
+        setPhotoPreviews(current => ({ ...current, [kind]: asset.uri }));
+      }
+      const photo = imageDataUrl(asset);
       if (
         (asset.fileSize !== undefined && asset.fileSize > 2 * 1024 * 1024) ||
         photo.length > 2_800_000
@@ -572,7 +624,7 @@ const JobCard = ({
         setPhotoError('Photo is too large. Please take another photo.');
         return;
       }
-      onProgress({[kind]: photo});
+      onProgress({ [kind]: photo });
     } catch (error) {
       setPhotoError(
         error instanceof Error ? error.message : 'Camera could not be opened.',
@@ -581,11 +633,31 @@ const JobCard = ({
   };
 
   const choosePhoto = (kind: 'beforePhoto' | 'afterPhoto') => {
-    Alert.alert('Cleaning photo', 'Take a photo or choose one from your gallery.', [
-      {text: 'Take photo', onPress: () => { capturePhoto(kind, 'camera'); }},
-      {text: 'Choose from gallery', onPress: () => { capturePhoto(kind, 'library'); }},
-      {text: 'Cancel', style: 'cancel'},
-    ]);
+    const captureAfterSheetCloses = (source: 'camera' | 'library') => {
+      setTimelineExpanded(false);
+      photoPickerTimer.current = setTimeout(() => {
+        photoPickerTimer.current = null;
+        capturePhoto(kind, source).finally(() => {
+          setTimelineExpanded(true);
+        });
+      }, SHEET_DISMISS_DELAY_MS);
+    };
+
+    Alert.alert(
+      'Cleaning photo',
+      'Take a photo or choose one from your gallery.',
+      [
+        {
+          text: 'Take photo',
+          onPress: () => captureAfterSheetCloses('camera'),
+        },
+        {
+          text: 'Choose from gallery',
+          onPress: () => captureAfterSheetCloses('library'),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   };
 
   return (
@@ -593,15 +665,24 @@ const JobCard = ({
       <ListItemPressable
         accessibilityLabel={`View ${job.serviceNameSnapshot || 'job'} details`}
         onPress={() => setTimelineExpanded(true)}
-        style={styles.jobSummary}>
+        style={styles.jobSummary}
+      >
         <View style={styles.row}>
           <Text style={styles.title}>
             {job.serviceNameSnapshot || 'Car wash'}
           </Text>
-          <Text style={styles.status} numberOfLines={1}>{job.status}</Text>
+          <Text style={styles.status} numberOfLines={1}>
+            {job.status}
+          </Text>
         </View>
-        <Text style={styles.copy} numberOfLines={1}>{car || 'Car details unavailable'}</Text>
-        {location ? <Text style={styles.copy} numberOfLines={1}>{location}</Text> : null}
+        <Text style={styles.copy} numberOfLines={1}>
+          {car || 'Car details unavailable'}
+        </Text>
+        {location ? (
+          <Text style={styles.copy} numberOfLines={1}>
+            {location}
+          </Text>
+        ) : null}
         <Text style={styles.copy} numberOfLines={1}>
           {new Date(job.bookingDate).toLocaleDateString()} · {job.bookingTime}
         </Text>
@@ -609,49 +690,64 @@ const JobCard = ({
       </ListItemPressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{expanded: timelineExpanded}}
+        accessibilityState={{ expanded: timelineExpanded }}
         onPress={() => setTimelineExpanded(value => !value)}
-        style={styles.manageButton}>
+        style={styles.manageButton}
+      >
         <Text style={styles.timelineToggleText}>Manage job</Text>
         <Feather name="chevron-right" size={17} color={colors.primary} />
       </Pressable>
       <DetailsSheet
         visible={timelineExpanded}
         setVisible={setTimelineExpanded}
-        title="Job details & progress">
-              <Text style={styles.copy}>Times shown in India time</Text>
-              {actionError ? (
-                <InfoMessage text={actionError} variant="error" />
-              ) : null}
-              <View style={styles.timeline}>
+        title="Job details & progress"
+      >
+        <Text style={styles.copy}>Times shown in India time</Text>
+        {actionError ? (
+          <InfoMessage text={actionError} variant="error" />
+        ) : null}
+        <View style={styles.timeline}>
           <View style={styles.detailsSection}>
             <Text style={styles.sectionTitle}>Booking details</Text>
-            <DetailRow title="Service" value={job.serviceNameSnapshot || 'Car wash'} />
+            <DetailRow
+              title="Service"
+              value={job.serviceNameSnapshot || 'Car wash'}
+            />
             <DetailRow
               title="Scheduled"
-              value={`${formatTimelineTime(job.bookingDate)} · ${job.bookingTime}`}
+              value={`${formatTimelineTime(job.bookingDate)} · ${
+                job.bookingTime
+              }`}
             />
             <DetailRow title="Vehicle" value={car || '—'} />
             {carDetails?.imageUrl ? (
               <Image
-                source={{uri: carDetails.imageUrl}}
+                source={{ uri: carDetails.imageUrl }}
                 style={styles.vehiclePhoto}
                 resizeMode="cover"
               />
             ) : null}
             <DetailRow title="Color" value={carDetails?.color || '—'} />
-            <DetailRow title="Vehicle type" value={carDetails?.carType || '—'} />
+            <DetailRow
+              title="Vehicle type"
+              value={carDetails?.carType || '—'}
+            />
             <DetailRow title="Parking" value={carDetails?.parkingSlot || '—'} />
             <DetailRow title="Society / flat" value={location || '—'} />
             <DetailRow title="Booking status" value={job.status} />
             <DetailRow title="Work status" value={workStatus} />
             <DetailRow title="Payment type" value={job.paymentType || '—'} />
-            <DetailRow title="Payment status" value={job.paymentStatus || '—'} />
+            <DetailRow
+              title="Payment status"
+              value={job.paymentStatus || '—'}
+            />
             {job.paymentMethod === 'Cash' ? (
               <DetailRow
                 title="Cash collection"
-                value={job.cashCollectionStatus ||
-                  (job.paymentStatus === 'Paid' ? 'Received' : 'NotRecorded')}
+                value={
+                  job.cashCollectionStatus ||
+                  (job.paymentStatus === 'Paid' ? 'Received' : 'NotRecorded')
+                }
               />
             ) : null}
             <DetailRow
@@ -668,7 +764,10 @@ const JobCard = ({
                 }
               />
             ) : null}
-            <DetailRow title="Booking note" value={job.remarks || 'No booking note'} />
+            <DetailRow
+              title="Booking note"
+              value={job.remarks || 'No booking note'}
+            />
           </View>
 
           <View style={styles.detailsSection}>
@@ -678,15 +777,22 @@ const JobCard = ({
                 <View style={styles.customerIdentity}>
                   {customer.imageUrl ? (
                     <Image
-                      source={{uri: customer.imageUrl}}
+                      source={{ uri: customer.imageUrl }}
                       style={styles.customerAvatar}
                     />
                   ) : (
-                    <View style={[styles.customerAvatar, styles.customerAvatarPlaceholder]}>
+                    <View
+                      style={[
+                        styles.customerAvatar,
+                        styles.customerAvatarPlaceholder,
+                      ]}
+                    >
                       <Feather name="user" size={19} color={colors.primary} />
                     </View>
                   )}
-                  <Text style={styles.title}>{customer.name || 'Customer'}</Text>
+                  <Text style={styles.title}>
+                    {customer.name || 'Customer'}
+                  </Text>
                 </View>
                 <DetailRow title="Phone" value={customer.phone || '—'} />
                 <DetailRow title="Email" value={customer.email || '—'} />
@@ -702,16 +808,42 @@ const JobCard = ({
             <View style={styles.photoRow}>
               <View style={styles.photoItem}>
                 <Text style={styles.copy}>Before cleaning</Text>
-                {job.beforePhoto ? (
-                  <Image source={{uri: job.beforePhoto}} style={styles.photo} />
+                {photoPreviews.beforePhoto || job.beforePhoto ? (
+                  <Image
+                    source={{
+                      uri: photoPreviews.beforePhoto || job.beforePhoto || '',
+                    }}
+                    style={styles.photo}
+                    onError={event =>
+                      setPhotoError(
+                        `Before-cleaning photo preview could not load: ${
+                          event.nativeEvent.error ||
+                          'Image source is unavailable.'
+                        }`,
+                      )
+                    }
+                  />
                 ) : (
                   <Text style={styles.photoPlaceholder}>Not uploaded</Text>
                 )}
               </View>
               <View style={styles.photoItem}>
                 <Text style={styles.copy}>After cleaning</Text>
-                {job.afterPhoto ? (
-                  <Image source={{uri: job.afterPhoto}} style={styles.photo} />
+                {photoPreviews.afterPhoto || job.afterPhoto ? (
+                  <Image
+                    source={{
+                      uri: photoPreviews.afterPhoto || job.afterPhoto || '',
+                    }}
+                    style={styles.photo}
+                    onError={event =>
+                      setPhotoError(
+                        `After-cleaning photo preview could not load: ${
+                          event.nativeEvent.error ||
+                          'Image source is unavailable.'
+                        }`,
+                      )
+                    }
+                  />
                 ) : (
                   <Text style={styles.photoPlaceholder}>Not uploaded</Text>
                 )}
@@ -735,7 +867,11 @@ const JobCard = ({
               return (
                 <View key={key} style={styles.detailRow}>
                   <Text style={styles.copy}>{title}</Text>
-                  <Text style={checked ? styles.checklistDone : styles.checklistPending}>
+                  <Text
+                    style={
+                      checked ? styles.checklistDone : styles.checklistPending
+                    }
+                  >
                     {checked ? 'Done' : 'Pending'}
                   </Text>
                 </View>
@@ -745,13 +881,18 @@ const JobCard = ({
 
           <View style={styles.detailsSection}>
             <Text style={styles.sectionTitle}>Worker notes</Text>
-            <Text style={styles.copy}>{job.workerNotes || 'No worker notes'}</Text>
+            <Text style={styles.copy}>
+              {job.workerNotes || 'No worker notes'}
+            </Text>
           </View>
 
           {(job.workSessions || []).map((session, index) => {
             const isLast = index === (job.workSessions?.length || 0) - 1;
             return (
-              <View key={`${session.startedAt}-${index}`} style={styles.timelineItem}>
+              <View
+                key={`${session.startedAt}-${index}`}
+                style={styles.timelineItem}
+              >
                 <View style={styles.timelineMarker} />
                 <View style={styles.timelineContent}>
                   <Text style={styles.timelineTitle}>
@@ -810,7 +951,9 @@ const JobCard = ({
               }
             />
           </View>
-          {!isFinal && job.status === 'Confirmed' && workStatus === 'NotStarted' ? (
+          {!isFinal &&
+          job.status === 'Confirmed' &&
+          workStatus === 'NotStarted' ? (
             <>
               {!job.beforePhoto ? (
                 <ActionButton
@@ -859,14 +1002,19 @@ const JobCard = ({
               />
             </View>
           ) : null}
-          {!isFinal && workStatus !== 'NotStarted' && workStatus !== 'Completed' ? (
+          {!isFinal &&
+          workStatus !== 'NotStarted' &&
+          workStatus !== 'Completed' ? (
             <View style={styles.progressSection}>
               <Text style={styles.workStatus}>Cleaning checklist</Text>
               {checklistItems.map(([key, title]) => (
                 <Pressable
                   key={key}
                   accessibilityRole="checkbox"
-                  accessibilityState={{checked: checklist[key], disabled: progressDisabled}}
+                  accessibilityState={{
+                    checked: checklist[key],
+                    disabled: progressDisabled,
+                  }}
                   disabled={progressDisabled || !isBookingDateToday}
                   onPress={() =>
                     onProgress({
@@ -876,15 +1024,29 @@ const JobCard = ({
                       },
                     })
                   }
-                  style={styles.checklistRow}>
+                  style={styles.checklistRow}
+                >
                   <Text style={styles.checklistMark}>
                     {checklist[key] ? '✓' : '○'}
                   </Text>
                   <Text style={styles.copy}>{title}</Text>
                 </Pressable>
               ))}
-              {job.afterPhoto ? (
-                <Image source={{uri: job.afterPhoto}} style={styles.photo} />
+              {photoPreviews.afterPhoto || job.afterPhoto ? (
+                <Image
+                  source={{
+                    uri: photoPreviews.afterPhoto || job.afterPhoto || '',
+                  }}
+                  style={styles.photo}
+                  onError={event =>
+                    setPhotoError(
+                      `After-cleaning photo preview could not load: ${
+                        event.nativeEvent.error ||
+                        'Image source is unavailable.'
+                      }`,
+                    )
+                  }
+                />
               ) : null}
               <ActionButton
                 title="Take after-cleaning photo"
@@ -903,12 +1065,14 @@ const JobCard = ({
               <ActionButton
                 title="Save notes"
                 variant="secondary"
-                onPress={() => onProgress({workerNotes: notes})}
+                onPress={() => onProgress({ workerNotes: notes })}
                 disabled={progressDisabled || !isBookingDateToday}
               />
             </View>
           ) : null}
-          {photoError ? <InfoMessage text={photoError} variant="error" /> : null}
+          {photoError ? (
+            <InfoMessage text={photoError} variant="error" />
+          ) : null}
           {!isFinal && workStatus !== 'NotStarted' && !canComplete ? (
             <Text style={styles.copy}>
               Add the after photo and complete every checklist item to finish.
@@ -925,10 +1089,11 @@ const JobCard = ({
                 : 'Work actions are only available on the booking date.'}
             </Text>
           ) : null}
-          {isFinal ? <Text style={styles.copy}>This job is closed.</Text> : null}
-              </View>
+          {isFinal ? (
+            <Text style={styles.copy}>This job is closed.</Text>
+          ) : null}
+        </View>
       </DetailsSheet>
-
     </Card>
   );
 };
@@ -936,14 +1101,17 @@ const JobCard = ({
 const label = (value: unknown) => {
   if (typeof value === 'string') return '';
   if (!value || typeof value !== 'object') return '';
-  const record = value as {name?: string; flatNumber?: string; block?: string};
+  const record = value as {
+    name?: string;
+    flatNumber?: string;
+    block?: string;
+  };
   return (
-    record.name ||
-    [record.block, record.flatNumber].filter(Boolean).join(' ')
+    record.name || [record.block, record.flatNumber].filter(Boolean).join(' ')
   );
 };
 
-const DetailRow = ({title, value}: {title: string; value: string}) => (
+const DetailRow = ({ title, value }: { title: string; value: string }) => (
   <View style={styles.detailRow}>
     <Text style={styles.detailLabel}>{title}</Text>
     <Text style={styles.detailValue}>{value}</Text>
@@ -952,12 +1120,19 @@ const DetailRow = ({title, value}: {title: string; value: string}) => (
 
 const styles = StyleSheet.create({
   list: {},
-  row: {flexDirection: 'row', justifyContent: 'space-between', gap: 8},
-  title: {fontSize: 15, fontWeight: '800', color: colors.ink, flexShrink: 1},
-  status: {maxWidth: '32%', marginLeft: 4, fontSize: 11, fontWeight: '700', color: colors.primary, textAlign: 'right'},
-  copy: {fontSize: 13, lineHeight: 19, color: colors.muted},
-  workStatus: {fontSize: 13, color: colors.ink, fontWeight: '700'},
-  progressSection: {gap: 8},
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  title: { fontSize: 15, fontWeight: '800', color: colors.ink, flexShrink: 1 },
+  status: {
+    maxWidth: '32%',
+    marginLeft: 4,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+    textAlign: 'right',
+  },
+  copy: { fontSize: 13, lineHeight: 19, color: colors.muted },
+  workStatus: { fontSize: 13, color: colors.ink, fontWeight: '700' },
+  progressSection: { gap: 8 },
   manageButton: {
     minHeight: 44,
     flexDirection: 'row',
@@ -967,25 +1142,65 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingTop: 8,
   },
-  jobSummary: {gap: 6},
-  timelineToggleText: {fontSize: 13, fontWeight: '700', color: colors.primary},
-  timeline: {gap: 10, borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 12},
-  detailsSection: {gap: 6, paddingBottom: 8},
-  vehiclePhoto: {width: '100%', height: 150, borderRadius: 12, backgroundColor: colors.canvas},
-  customerIdentity: {flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5},
-  customerAvatar: {width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas},
-  customerAvatarPlaceholder: {alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paleBlue},
-  sectionTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
-  detailRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
-  detailLabel: {flex: 1, fontSize: 12, color: colors.muted},
-  detailValue: {flex: 1, textAlign: 'right', fontSize: 12, color: colors.ink, fontWeight: '600'},
-  timelineItem: {flexDirection: 'row', gap: 8},
-  timelineMarker: {width: 8, height: 8, marginTop: 5, borderRadius: 4, backgroundColor: colors.primary},
-  timelineContent: {flex: 1, gap: 2},
-  timelineTitle: {fontSize: 13, fontWeight: '700', color: colors.ink},
-  timelineActive: {fontSize: 12, fontWeight: '600', color: colors.success},
-  photoRow: {flexDirection: 'row', gap: 8},
-  photoItem: {flex: 1, gap: 4},
+  jobSummary: { gap: 6 },
+  timelineToggleText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  timeline: {
+    gap: 10,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
+    paddingLeft: 12,
+  },
+  detailsSection: { gap: 6, paddingBottom: 8 },
+  vehiclePhoto: {
+    width: '100%',
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: colors.canvas,
+  },
+  customerIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 5,
+  },
+  customerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.canvas,
+  },
+  customerAvatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.paleBlue,
+  },
+  sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.ink },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  detailLabel: { flex: 1, fontSize: 12, color: colors.muted },
+  detailValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 12,
+    color: colors.ink,
+    fontWeight: '600',
+  },
+  timelineItem: { flexDirection: 'row', gap: 8 },
+  timelineMarker: {
+    width: 8,
+    height: 8,
+    marginTop: 5,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+  },
+  timelineContent: { flex: 1, gap: 2 },
+  timelineTitle: { fontSize: 13, fontWeight: '700', color: colors.ink },
+  timelineActive: { fontSize: 12, fontWeight: '600', color: colors.success },
+  photoRow: { flexDirection: 'row', gap: 8 },
+  photoItem: { flex: 1, gap: 4 },
   photoPlaceholder: {
     height: 110,
     textAlign: 'center',
@@ -996,16 +1211,26 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
   },
-  checklistDone: {fontSize: 12, fontWeight: '700', color: colors.success},
-  checklistPending: {fontSize: 12, color: colors.muted},
-  checklistRow: {flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36},
-  checklistMark: {fontSize: 19, color: colors.primary, fontWeight: '800'},
-  photo: {width: '100%', height: 190, borderRadius: 10, backgroundColor: colors.canvas},
-  actions: {flexDirection: 'row'},
-  action: {flex: 1},
-  actionNext: {marginLeft: 8},
-  filters: {flexDirection: 'row', flexWrap: 'wrap'},
-  monthNavigation: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  checklistDone: { fontSize: 12, fontWeight: '700', color: colors.success },
+  checklistPending: { fontSize: 12, color: colors.muted },
+  checklistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 36,
+  },
+  checklistMark: { fontSize: 19, color: colors.primary, fontWeight: '800' },
+  photo: {
+    width: '100%',
+    height: 190,
+    borderRadius: 10,
+    backgroundColor: colors.canvas,
+  },
+  actions: { flexDirection: 'row' },
+  action: { flex: 1 },
+  actionNext: { marginLeft: 8 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap' },
+  monthNavigation: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   monthArrow: {
     width: 40,
     height: 40,
@@ -1016,8 +1241,14 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: colors.white,
   },
-  monthLabel: {flex: 1, textAlign: 'center', color: colors.ink, fontSize: 16, fontWeight: '800'},
-  stats: {flexDirection: 'row', gap: 8},
+  monthLabel: {
+    flex: 1,
+    textAlign: 'center',
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  stats: { flexDirection: 'row', gap: 8 },
   stat: {
     flex: 1,
     minWidth: 0,
@@ -1030,26 +1261,61 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  statNumber: {fontSize: 16, fontWeight: '900', color: colors.ink},
-  statLabel: {fontSize: 10, fontWeight: '600', color: colors.muted},
-  days: {gap: 8, paddingVertical: 3},
-  day: {width: 64, minHeight: 76, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 5, backgroundColor: colors.white},
-  daySelected: {backgroundColor: colors.primary, borderColor: colors.primary},
-  dayName: {fontSize: 10, fontWeight: '600', color: colors.muted},
-  dayNumber: {fontSize: 15, color: colors.ink},
-  dayCount: {fontSize: 9, color: colors.muted},
-  dayTextSelected: {color: colors.white},
-  dayGroup: {paddingBottom: 4},
-  dayHeading: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6, marginBottom: 10},
-  dayTitle: {fontSize: 15, fontWeight: '800', color: colors.ink},
-  filterHeading: {flexDirection: 'row', alignItems: 'center', gap: 7},
-  filterHeadingText: {fontSize: 12, fontWeight: '700', color: colors.muted},
-  filter: {marginRight: 7, marginBottom: 7, borderRadius: 18, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.white},
-  filterSelected: {backgroundColor: colors.paleBlue, borderColor: colors.primary},
-  filterText: {fontSize: 12, color: colors.muted, fontWeight: '600'},
-  filterTextSelected: {color: colors.primaryDark},
-  emptyCard: {alignItems: 'flex-start', gap: 10, borderRadius: 18},
-  emptyIcon: {width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.paleBlue},
+  statNumber: { fontSize: 16, fontWeight: '900', color: colors.ink },
+  statLabel: { fontSize: 10, fontWeight: '600', color: colors.muted },
+  days: { gap: 8, paddingVertical: 3 },
+  day: {
+    width: 64,
+    minHeight: 76,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    padding: 5,
+    backgroundColor: colors.white,
+  },
+  daySelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  dayName: { fontSize: 10, fontWeight: '600', color: colors.muted },
+  dayNumber: { fontSize: 15, color: colors.ink },
+  dayCount: { fontSize: 9, color: colors.muted },
+  dayTextSelected: { color: colors.white },
+  dayGroup: { paddingBottom: 4 },
+  dayHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 6,
+    marginBottom: 10,
+  },
+  dayTitle: { fontSize: 15, fontWeight: '800', color: colors.ink },
+  filterHeading: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  filterHeadingText: { fontSize: 12, fontWeight: '700', color: colors.muted },
+  filter: {
+    marginRight: 7,
+    marginBottom: 7,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: colors.white,
+  },
+  filterSelected: {
+    backgroundColor: colors.paleBlue,
+    borderColor: colors.primary,
+  },
+  filterText: { fontSize: 12, color: colors.muted, fontWeight: '600' },
+  filterTextSelected: { color: colors.primaryDark },
+  emptyCard: { alignItems: 'flex-start', gap: 10, borderRadius: 18 },
+  emptyIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.paleBlue,
+  },
 });
 
 export default WorkerJobsScreen;

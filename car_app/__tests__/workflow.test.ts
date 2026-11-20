@@ -1,9 +1,10 @@
-import {singleDayAvailabilityRange} from '../app/utils/availability-range';
+import { singleDayAvailabilityRange } from '../app/utils/availability-range';
 import {
   canPerformBookingWorkAction,
   canPerformWorkAction,
 } from '../app/store/worker-workflow';
-import type {WorkerAttendance} from '../app/store/types';
+import type { WorkerAttendance } from '../app/store/types';
+import { normalizeImageAsset } from '../app/utils/mobile-image';
 
 describe('worker attendance workflow', () => {
   const actions = ['start', 'stop', 'resume', 'done'] as const;
@@ -20,7 +21,7 @@ describe('worker attendance workflow', () => {
       expect(canPerformWorkAction(null, action)).toBe(false);
       expect(
         canPerformWorkAction(
-          {...punchedIn, punchOutAt: '2026-11-02T12:00:00.000Z'},
+          { ...punchedIn, punchOutAt: '2026-11-02T12:00:00.000Z' },
           action,
         ),
       ).toBe(false);
@@ -70,13 +71,54 @@ describe('worker booking-date workflow', () => {
 
 describe('single-day availability range', () => {
   it('handles the empty date before a day is selected', () => {
-    expect(singleDayAvailabilityRange('')).toEqual({from: '', to: ''});
+    expect(singleDayAvailabilityRange('')).toEqual({ from: '', to: '' });
   });
 
   it('uses the selected day as the inclusive start and the next day as the exclusive end', () => {
     expect(singleDayAvailabilityRange('2026-11-30')).toEqual({
       from: '2026-11-30',
       to: '2026-12-01',
+    });
+  });
+
+  describe('mobile image picker normalization', () => {
+    it('uses the encoded image format when the picker MIME type is missing or incorrect', () => {
+      expect(
+        normalizeImageAsset({
+          base64: '/9j/4AAQSkZJRgABAQAAAQABAAD',
+          type: 'image/heic',
+        }),
+      ).toMatchObject({ type: 'image/jpeg' });
+
+      expect(
+        normalizeImageAsset({
+          base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB',
+        }),
+      ).toMatchObject({ type: 'image/png' });
+    });
+
+    it('normalizes JPEG MIME aliases and rejects missing or unsupported photo data', () => {
+      expect(
+        normalizeImageAsset({
+          base64: 'opaque-image-data',
+          type: 'image/jpg',
+        }),
+      ).toMatchObject({ type: 'image/jpeg' });
+
+      expect(() =>
+        normalizeImageAsset({
+          uri: 'content://photo/1',
+          type: 'image/heic',
+        }),
+      ).toThrow(
+        'Picker details: MIME=image/heic; base64=missing; URI scheme=content',
+      );
+      expect(() =>
+        normalizeImageAsset({
+          base64: 'opaque-image-data',
+          type: 'image/heic',
+        }),
+      ).toThrow('Use JPEG, PNG, or WebP.');
     });
   });
 

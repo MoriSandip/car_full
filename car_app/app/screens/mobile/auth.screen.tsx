@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Image,
@@ -15,7 +15,12 @@ import {
   launchImageLibrary,
   type Asset,
 } from 'react-native-image-picker';
-import {useDispatch} from 'react-redux';
+import {
+  describeImageAsset,
+  normalizeImageAsset,
+  photoPickerOptions,
+} from '../../utils/mobile-image';
+import { useDispatch } from 'react-redux';
 import {
   ActionButton,
   Card,
@@ -35,11 +40,11 @@ import {
   useWorkerLoginMutation,
   userFromLogin,
 } from '../../store/auth.api';
-import {AppRole, setCredentials} from '../../store/auth.slice';
+import { AppRole, setCredentials } from '../../store/auth.slice';
 
 const readError = (error: unknown) => {
   const response = error as {
-    data?: {message?: string; error?: {message?: string}};
+    data?: { message?: string; error?: { message?: string } };
     message?: string;
   };
   return (
@@ -62,8 +67,11 @@ const AuthScreen = ({
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [profileImage, setProfileImage] = useState<Asset | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState('');
   const [email, setEmail] = useState('');
-  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
+  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>(
+    'password',
+  );
   const [otpChannel, setOtpChannel] = useState<'email' | 'phone'>('email');
   const [otpIdentifier, setOtpIdentifier] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -107,42 +115,49 @@ const AuthScreen = ({
         }
       }
 
-      const options = {
-        mediaType: 'photo' as const,
-        selectionLimit: 1,
-        includeBase64: true,
-        quality: 0.7 as const,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        assetRepresentationMode: 'compatible' as const,
-        saveToPhotos: false,
-      };
+      const options = photoPickerOptions(0.7, 1024);
       const result =
         source === 'camera'
-          ? await launchCamera({...options, cameraType: 'front'})
+          ? await launchCamera({
+              ...options,
+              cameraType: 'front',
+              saveToPhotos: false,
+            })
           : await launchImageLibrary(options);
       if (result.didCancel) return;
-      if (result.errorCode) {
-        setError(result.errorMessage || 'Could not open the photo picker.');
+      if (result.errorCode || result.errorMessage) {
+        setError(
+          `Photo picker error (${result.errorCode || 'unknown'}): ${
+            result.errorMessage || 'No additional details were returned.'
+          }`,
+        );
         return;
       }
       const asset = result.assets?.[0];
-      if (!asset?.uri || !asset.base64) {
-        setError('Could not read the selected photo. Please try another one.');
+      if (!asset) {
+        setError(describeImageAsset());
         return;
       }
-      if (!asset.type || !/^image\/(jpeg|png|webp)$/.test(asset.type)) {
-        setError('Choose a JPEG, PNG, or WebP profile photo.');
+      setProfileImage(null);
+      setProfileImagePreview(asset.uri || '');
+      const normalizedAsset = normalizeImageAsset(asset);
+      if (!asset.uri) {
+        setError(
+          `Image data is available, but the picker did not return a preview URI. ${describeImageAsset(
+            asset,
+          )}`,
+        );
         return;
       }
       if (
-        (asset.fileSize !== undefined && asset.fileSize > 5 * 1024 * 1024) ||
-        asset.base64.length > 7_000_000
+        (normalizedAsset.fileSize !== undefined &&
+          normalizedAsset.fileSize > 5 * 1024 * 1024) ||
+        normalizedAsset.base64.length > 7_000_000
       ) {
         setError('Profile photo must be 5 MB or smaller.');
         return;
       }
-      setProfileImage(asset);
+      setProfileImage(normalizedAsset);
     } catch (pickerError) {
       setError(
         pickerError instanceof Error
@@ -153,11 +168,25 @@ const AuthScreen = ({
   };
 
   const showProfileImageOptions = () => {
-    Alert.alert('Profile photo', 'Take a photo or choose one from your gallery.', [
-      {text: 'Take photo', onPress: () => { selectProfileImage('camera'); }},
-      {text: 'Choose from gallery', onPress: () => { selectProfileImage('library'); }},
-      {text: 'Cancel', style: 'cancel'},
-    ]);
+    Alert.alert(
+      'Profile photo',
+      'Take a photo or choose one from your gallery.',
+      [
+        {
+          text: 'Take photo',
+          onPress: () => {
+            selectProfileImage('camera');
+          },
+        },
+        {
+          text: 'Choose from gallery',
+          onPress: () => {
+            selectProfileImage('library');
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   };
 
   const changeRole = (nextRole: AppRole) => {
@@ -177,7 +206,11 @@ const AuthScreen = ({
     setError('');
     setNotice('');
     if (!otpIdentifier.trim()) {
-      setError(`Enter your registered ${otpChannel === 'email' ? 'email address' : 'phone number'}.`);
+      setError(
+        `Enter your registered ${
+          otpChannel === 'email' ? 'email address' : 'phone number'
+        }.`,
+      );
       return;
     }
 
@@ -322,7 +355,8 @@ const AuthScreen = ({
   return (
     <KeyboardAvoidingView
       style={styles.keyboard}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <Page contentStyle={styles.page}>
         <View style={styles.brand}>
           <Text style={styles.brandMark}>CW</Text>
@@ -335,8 +369,8 @@ const AuthScreen = ({
                 ? 'Set a new password'
                 : 'Reset your password'
               : registering
-                ? 'Create your account'
-                : 'Welcome back'
+              ? 'Create your account'
+              : 'Welcome back'
           }
           subtitle={
             recovering
@@ -344,8 +378,8 @@ const AuthScreen = ({
                 ? `Enter the code sent to ${email} and choose a new password.`
                 : 'Enter your email and we will send a one-time reset code.'
               : role === 'CUSTOMER'
-                ? 'Sign in to book a wash and track your car.'
-                : 'Sign in to see your assigned wash jobs.'
+              ? 'Sign in to book a wash and track your car.'
+              : 'Sign in to see your assigned wash jobs.'
           }
         />
 
@@ -354,17 +388,19 @@ const AuthScreen = ({
             <Pressable
               key={option}
               accessibilityRole="button"
-              accessibilityState={{selected: role === option}}
+              accessibilityState={{ selected: role === option }}
               onPress={() => changeRole(option)}
               style={[
                 styles.roleOption,
                 role === option && styles.roleSelected,
-              ]}>
+              ]}
+            >
               <Text
                 style={[
                   styles.roleText,
                   role === option && styles.roleTextSelected,
-                ]}>
+                ]}
+              >
                 {option === 'CUSTOMER' ? 'Customer' : 'Worker'}
               </Text>
             </Pressable>
@@ -377,7 +413,7 @@ const AuthScreen = ({
               <Pressable
                 key={method}
                 accessibilityRole="button"
-                accessibilityState={{selected: loginMethod === method}}
+                accessibilityState={{ selected: loginMethod === method }}
                 onPress={() => {
                   setLoginMethod(method);
                   setOtpRequested(false);
@@ -388,13 +424,17 @@ const AuthScreen = ({
                 style={[
                   styles.otpChannelOption,
                   loginMethod === method && styles.otpChannelSelected,
-                ]}>
+                ]}
+              >
                 <Text
                   style={[
                     styles.roleText,
                     loginMethod === method && styles.roleTextSelected,
-                  ]}>
-                  {method === 'password' ? 'Email & password' : 'Login with OTP'}
+                  ]}
+                >
+                  {method === 'password'
+                    ? 'Email & password'
+                    : 'Login with OTP'}
                 </Text>
               </Pressable>
             ))}
@@ -416,8 +456,29 @@ const AuthScreen = ({
             <View style={styles.profilePhotoSection}>
               {profileImage?.uri ? (
                 <Image
-                  source={{uri: profileImage.uri}}
+                  source={{ uri: profileImagePreview || profileImage.uri }}
                   style={styles.profilePhoto}
+                  onError={event =>
+                    setError(
+                      `Profile photo was selected, but its preview could not load: ${
+                        event.nativeEvent.error ||
+                        'Image source is unavailable.'
+                      }`,
+                    )
+                  }
+                />
+              ) : profileImagePreview ? (
+                <Image
+                  source={{ uri: profileImagePreview }}
+                  style={styles.profilePhoto}
+                  onError={event =>
+                    setError(
+                      `Profile photo was selected, but its preview could not load: ${
+                        event.nativeEvent.error ||
+                        'Image source is unavailable.'
+                      }`,
+                    )
+                  }
                 />
               ) : (
                 <View style={styles.profilePhotoPlaceholder}>
@@ -428,18 +489,28 @@ const AuthScreen = ({
               )}
               <View style={styles.profilePhotoCopy}>
                 <Text style={styles.profilePhotoTitle}>Profile photo</Text>
-                <Text style={styles.profilePhotoHint}>Optional · JPEG, PNG or WebP</Text>
+                <Text style={styles.profilePhotoHint}>
+                  Optional · JPEG, PNG or WebP
+                </Text>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={showProfileImageOptions}>
+                  onPress={showProfileImageOptions}
+                >
                   <Text style={styles.footerLink}>
-                    {profileImage ? 'Change photo' : 'Take or choose photo'}
+                    {profileImagePreview
+                      ? 'Change photo'
+                      : 'Take or choose photo'}
                   </Text>
                 </Pressable>
-                {profileImage ? (
+                {profileImagePreview ? (
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => setProfileImage(null)}>
+                    onPress={() => {
+                      setProfileImage(null);
+                      setProfileImagePreview('');
+                      setError('');
+                    }}
+                  >
                     <Text style={styles.profilePhotoRemove}>Remove photo</Text>
                   </Pressable>
                 ) : null}
@@ -467,7 +538,7 @@ const AuthScreen = ({
                   <Pressable
                     key={channel}
                     accessibilityRole="button"
-                    accessibilityState={{selected: otpChannel === channel}}
+                    accessibilityState={{ selected: otpChannel === channel }}
                     onPress={() => {
                       setOtpChannel(channel);
                       setOtpRequested(false);
@@ -478,12 +549,14 @@ const AuthScreen = ({
                     style={[
                       styles.otpChannelOption,
                       otpChannel === channel && styles.otpChannelSelected,
-                    ]}>
+                    ]}
+                  >
                     <Text
                       style={[
                         styles.roleText,
                         otpChannel === channel && styles.roleTextSelected,
-                      ]}>
+                      ]}
+                    >
                       {channel === 'email' ? 'Email' : 'Phone'}
                     </Text>
                   </Pressable>
@@ -491,10 +564,14 @@ const AuthScreen = ({
               </View>
               <TextField
                 accessibilityLabel={
-                  otpChannel === 'email' ? 'Registered email address' : 'Registered phone number'
+                  otpChannel === 'email'
+                    ? 'Registered email address'
+                    : 'Registered phone number'
                 }
                 placeholder={
-                  otpChannel === 'email' ? 'Registered email address' : 'Registered phone number'
+                  otpChannel === 'email'
+                    ? 'Registered email address'
+                    : 'Registered phone number'
                 }
                 value={otpIdentifier}
                 onChangeText={value => {
@@ -506,15 +583,21 @@ const AuthScreen = ({
                 }}
                 autoCapitalize="none"
                 autoComplete={otpChannel === 'email' ? 'email' : 'tel'}
-                keyboardType={otpChannel === 'email' ? 'email-address' : 'phone-pad'}
-                textContentType={otpChannel === 'email' ? 'emailAddress' : 'telephoneNumber'}
+                keyboardType={
+                  otpChannel === 'email' ? 'email-address' : 'phone-pad'
+                }
+                textContentType={
+                  otpChannel === 'email' ? 'emailAddress' : 'telephoneNumber'
+                }
                 returnKeyType="next"
               />
               {otpRequested && (
                 <>
                   <Text style={styles.otpHint}>
                     OTP destination: {otpDestination}
-                    {developmentOtp ? ` - Development OTP: ${developmentOtp}` : ''}
+                    {developmentOtp
+                      ? ` - Development OTP: ${developmentOtp}`
+                      : ''}
                   </Text>
                   <TextField
                     accessibilityLabel="6-digit login OTP"
@@ -532,7 +615,8 @@ const AuthScreen = ({
                   <Pressable
                     accessibilityRole="button"
                     disabled={isOtpLoading}
-                    onPress={handleRequestLoginOtp}>
+                    onPress={handleRequestLoginOtp}
+                  >
                     <Text style={styles.footerLink}>Resend OTP</Text>
                   </Pressable>
                 </>
@@ -609,16 +693,16 @@ const AuthScreen = ({
               isLoading || isOtpLoading
                 ? 'Please wait...'
                 : recovering
-                  ? codeSent
-                    ? 'Reset password'
-                    : 'Send reset code'
-                  : registering
-                    ? 'Create account'
-                    : loginMethod === 'otp'
-                      ? otpRequested
-                        ? 'Verify OTP and sign in'
-                        : 'Send OTP'
-                      : `Sign in as ${role === 'CUSTOMER' ? 'customer' : 'worker'}`
+                ? codeSent
+                  ? 'Reset password'
+                  : 'Send reset code'
+                : registering
+                ? 'Create account'
+                : loginMethod === 'otp'
+                ? otpRequested
+                  ? 'Verify OTP and sign in'
+                  : 'Send OTP'
+                : `Sign in as ${role === 'CUSTOMER' ? 'customer' : 'worker'}`
             }
             onPress={
               recovering
@@ -626,10 +710,10 @@ const AuthScreen = ({
                   ? handleResetPassword
                   : handleRequestReset
                 : loginMethod === 'otp' && !registering
-                  ? otpRequested
-                    ? handleVerifyLoginOtp
-                    : handleRequestLoginOtp
-                  : handleSubmit
+                ? otpRequested
+                  ? handleVerifyLoginOtp
+                  : handleRequestLoginOtp
+                : handleSubmit
             }
             disabled={isLoading || isOtpLoading}
           />
@@ -644,14 +728,16 @@ const AuthScreen = ({
                 setCodeSent(false);
                 setError('');
                 setNotice('');
-              }}>
+              }}
+            >
               <Text style={styles.footerLink}>Return to sign in</Text>
             </Pressable>
             {codeSent ? (
               <Pressable
                 accessibilityRole="button"
                 disabled={isLoading}
-                onPress={handleRequestReset}>
+                onPress={handleRequestReset}
+              >
                 <Text style={styles.footerLink}>Resend code</Text>
               </Pressable>
             ) : null}
@@ -667,7 +753,8 @@ const AuthScreen = ({
                 setRegistering(!registering);
                 setError('');
                 setNotice('');
-              }}>
+              }}
+            >
               <Text style={styles.footerLink}>
                 {registering ? 'Sign in' : 'Create account'}
               </Text>
@@ -679,7 +766,8 @@ const AuthScreen = ({
                   setRecovering(true);
                   setError('');
                   setNotice('');
-                }}>
+                }}
+              >
                 <Text style={styles.footerLink}>Forgot password?</Text>
               </Pressable>
             )}
@@ -694,7 +782,8 @@ const AuthScreen = ({
                   setRecovering(true);
                   setError('');
                   setNotice('');
-                }}>
+                }}
+              >
                 <Text style={styles.footerLink}>Forgot password?</Text>
               </Pressable>
             )}
@@ -706,9 +795,14 @@ const AuthScreen = ({
 };
 
 const styles = StyleSheet.create({
-  keyboard: {flex: 1},
-  page: {flexGrow: 1, justifyContent: 'center', paddingVertical: 40},
-  brand: {flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20},
+  keyboard: { flex: 1 },
+  page: { flexGrow: 1, justifyContent: 'center', paddingVertical: 40 },
+  brand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
   brandMark: {
     width: 44,
     height: 44,
@@ -721,7 +815,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  brandName: {fontSize: 21, fontWeight: '800', color: colors.ink},
+  brandName: { fontSize: 21, fontWeight: '800', color: colors.ink },
   profilePhotoSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -732,7 +826,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.canvas,
   },
-  profilePhoto: {width: 64, height: 64, borderRadius: 32},
+  profilePhoto: { width: 64, height: 64, borderRadius: 32 },
   profilePhotoPlaceholder: {
     width: 64,
     height: 64,
@@ -741,25 +835,29 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     backgroundColor: colors.paleBlue,
   },
-  profilePhotoInitial: {fontSize: 22, fontWeight: '800', color: colors.primary},
-  profilePhotoCopy: {flex: 1, gap: 4},
-  profilePhotoTitle: {fontSize: 14, fontWeight: '700', color: colors.ink},
-  profilePhotoHint: {fontSize: 12, color: colors.muted},
-  profilePhotoRemove: {fontSize: 13, fontWeight: '700', color: colors.danger},
+  profilePhotoInitial: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  profilePhotoCopy: { flex: 1, gap: 4 },
+  profilePhotoTitle: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  profilePhotoHint: { fontSize: 12, color: colors.muted },
+  profilePhotoRemove: { fontSize: 13, fontWeight: '700', color: colors.danger },
   roleSwitch: {
     flexDirection: 'row',
     padding: 4,
     borderRadius: 13,
     backgroundColor: '#E8EEF1',
   },
-  roleOption: {flex: 1, alignItems: 'center', paddingVertical: 12},
+  roleOption: { flex: 1, alignItems: 'center', paddingVertical: 12 },
   roleSelected: {
     backgroundColor: colors.surface,
     borderRadius: 10,
     elevation: 1,
   },
-  roleText: {fontSize: 14, fontWeight: '600', color: colors.muted},
-  roleTextSelected: {color: colors.primaryDark},
+  roleText: { fontSize: 14, fontWeight: '600', color: colors.muted },
+  roleTextSelected: { color: colors.primaryDark },
   loginMethodSwitch: {
     flexDirection: 'row',
     marginBottom: 14,
@@ -767,17 +865,17 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: '#E8EEF1',
   },
-  otpChannelSwitch: {flexDirection: 'row', gap: 8},
-  otpChannelOption: {flex: 1, alignItems: 'center', paddingVertical: 11},
+  otpChannelSwitch: { flexDirection: 'row', gap: 8 },
+  otpChannelOption: { flex: 1, alignItems: 'center', paddingVertical: 11 },
   otpChannelSelected: {
     backgroundColor: colors.surface,
     borderRadius: 10,
     elevation: 1,
   },
-  otpHint: {fontSize: 13, color: colors.muted},
-  footer: {flexDirection: 'row', justifyContent: 'center', gap: 6},
-  footerText: {color: colors.muted, fontSize: 14},
-  footerLink: {color: colors.primaryDark, fontSize: 14, fontWeight: '700'},
+  otpHint: { fontSize: 13, color: colors.muted },
+  footer: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  footerText: { color: colors.muted, fontSize: 14 },
+  footerLink: { color: colors.primaryDark, fontSize: 14, fontWeight: '700' },
 });
 
 export default AuthScreen;

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   Image,
   PermissionsAndroid,
@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
-import {launchCamera} from 'react-native-image-picker';
+import { launchCamera } from 'react-native-image-picker';
 import {
   ActionButton,
   Card,
@@ -23,10 +23,17 @@ import {
   useGetMyAttendanceQuery,
   usePunchAttendanceMutation,
 } from '../../store/worker.api';
+import {
+  describeImageAsset,
+  imageDataUrl,
+  photoPickerOptions,
+} from '../../utils/mobile-image';
 
 const errorMessage = (error: unknown) => {
-  const value = error as {data?: {message?: string}; message?: string};
-  return value.data?.message || value.message || 'Attendance could not be saved.';
+  const value = error as { data?: { message?: string }; message?: string };
+  return (
+    value.data?.message || value.message || 'Attendance could not be saved.'
+  );
 };
 
 const formatTime = (value?: string | null) =>
@@ -38,10 +45,11 @@ const formatTime = (value?: string | null) =>
     : '—';
 
 const WorkerAttendanceScreen = () => {
-  const {data, isLoading, isError, refetch, isFetching} =
+  const { data, isLoading, isError, refetch, isFetching } =
     useGetMyAttendanceQuery();
   const [punch, mutation] = usePunchAttendanceMutation();
   const [selfie, setSelfie] = useState('');
+  const [selfiePreview, setSelfiePreview] = useState('');
   const [error, setError] = useState('');
   const attendance = data?.data ?? null;
   const isPunchedIn = Boolean(attendance);
@@ -60,25 +68,35 @@ const WorkerAttendanceScreen = () => {
         }
       }
       const result = await launchCamera({
-        mediaType: 'photo',
+        ...photoPickerOptions(0.7, 1280),
         cameraType: 'front',
-        quality: 0.7,
-        maxWidth: 1280,
-        maxHeight: 1280,
-        includeBase64: true,
         saveToPhotos: false,
       });
       if (result.didCancel) return;
-      if (result.errorCode) {
-        setError(result.errorMessage || 'Camera could not be opened.');
+      if (result.errorCode || result.errorMessage) {
+        setError(
+          `Camera error (${result.errorCode || 'unknown'}): ${
+            result.errorMessage || 'No additional details were returned.'
+          }`,
+        );
         return;
       }
       const asset = result.assets?.[0];
-      if (!asset?.base64 || !asset.type?.match(/^image\/(jpeg|png|webp)$/)) {
-        setError('Could not read the selfie. Please take another photo.');
+      if (!asset) {
+        setError(describeImageAsset());
         return;
       }
-      const imageData = `data:${asset.type};base64,${asset.base64}`;
+      setSelfie('');
+      setSelfiePreview(asset.uri || '');
+      const imageData = imageDataUrl(asset);
+      if (!asset.uri) {
+        setError(
+          `Image data is available, but the camera did not return a preview URI. ${describeImageAsset(
+            asset,
+          )}`,
+        );
+        return;
+      }
       if (imageData.length > 7_000_000) {
         setError('Selfie is too large. Please take another photo.');
         return;
@@ -93,13 +111,14 @@ const WorkerAttendanceScreen = () => {
 
   const submitPunch = async () => {
     if (!selfie) {
-      setError('Take a selfie before punching in or out.');
+      if (!selfiePreview) setError('Take a selfie before punching in or out.');
       return;
     }
     setError('');
     try {
-      await punch({action: isPunchedIn ? 'out' : 'in', selfie}).unwrap();
+      await punch({ action: isPunchedIn ? 'out' : 'in', selfie }).unwrap();
       setSelfie('');
+      setSelfiePreview('');
       await refetch();
     } catch (cause) {
       setError(errorMessage(cause));
@@ -116,8 +135,10 @@ const WorkerAttendanceScreen = () => {
           }}
           tintColor={colors.primary}
         />
-      }>
-      <PageTitle compact
+      }
+    >
+      <PageTitle
+        compact
         title="My attendance"
         subtitle="Take a selfie to record today's punch in and punch out."
       />
@@ -153,14 +174,18 @@ const WorkerAttendanceScreen = () => {
                   <Feather name="log-in" size={14} color={colors.primary} />
                   <Text style={styles.label}>In</Text>
                 </View>
-                <Text style={styles.time}>{formatTime(attendance?.punchInAt)}</Text>
+                <Text style={styles.time}>
+                  {formatTime(attendance?.punchInAt)}
+                </Text>
               </View>
               <View style={styles.timeValue}>
                 <View style={styles.timeLabel}>
                   <Feather name="log-out" size={14} color={colors.muted} />
                   <Text style={styles.label}>Out</Text>
                 </View>
-                <Text style={styles.time}>{formatTime(attendance?.punchOutAt)}</Text>
+                <Text style={styles.time}>
+                  {formatTime(attendance?.punchOutAt)}
+                </Text>
               </View>
             </View>
           </Card>
@@ -177,8 +202,18 @@ const WorkerAttendanceScreen = () => {
                 </Text>
               </View>
             </View>
-            {selfie ? (
-              <Image source={{uri: selfie}} style={styles.preview} />
+            {selfiePreview || selfie ? (
+              <Image
+                source={{ uri: selfiePreview || selfie }}
+                style={styles.preview}
+                onError={event =>
+                  setError(
+                    `Selfie was captured, but its preview could not load: ${
+                      event.nativeEvent.error || 'Image source is unavailable.'
+                    }`,
+                  )
+                }
+              />
             ) : (
               <View style={styles.selfiePlaceholder}>
                 <View style={styles.cameraIcon}>
@@ -191,7 +226,7 @@ const WorkerAttendanceScreen = () => {
               </View>
             )}
             <ActionButton
-              title={selfie ? 'Retake selfie' : 'Take selfie'}
+              title={selfiePreview || selfie ? 'Retake selfie' : 'Take selfie'}
               onPress={captureSelfie}
               variant="secondary"
             />
@@ -209,11 +244,11 @@ const WorkerAttendanceScreen = () => {
                 mutation.isLoading
                   ? 'Saving attendance...'
                   : isPunchedIn
-                    ? 'Punch out'
-                    : 'Punch in'
+                  ? 'Punch out'
+                  : 'Punch in'
               }
               onPress={submitPunch}
-              disabled={mutation.isLoading}
+              disabled={mutation.isLoading || (!!selfiePreview && !selfie)}
               variant={isPunchedIn ? 'danger' : 'primary'}
             />
           )}
@@ -224,9 +259,9 @@ const WorkerAttendanceScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  shiftCard: {gap: 11, borderRadius: 14},
-  selfieCard: {gap: 11, borderRadius: 14},
-  cardHeading: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  shiftCard: { gap: 11, borderRadius: 14 },
+  selfieCard: { gap: 11, borderRadius: 14 },
+  cardHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardIcon: {
     width: 34,
     height: 34,
@@ -235,9 +270,9 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: colors.paleBlue,
   },
-  cardHeadingCopy: {flex: 1, gap: 3},
-  heading: {fontSize: 15, fontWeight: '800', color: colors.ink},
-  copy: {fontSize: 13, lineHeight: 19, color: colors.muted},
+  cardHeadingCopy: { flex: 1, gap: 3 },
+  heading: { fontSize: 15, fontWeight: '800', color: colors.ink },
+  copy: { fontSize: 13, lineHeight: 19, color: colors.muted },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -250,10 +285,10 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3,
   },
-  timeLabel: {flexDirection: 'row', alignItems: 'center', gap: 6},
-  label: {fontSize: 11, fontWeight: '600', color: colors.muted},
-  time: {fontSize: 16, fontWeight: '800', color: colors.ink},
-  preview: {width: '100%', height: 220, borderRadius: 14},
+  timeLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  label: { fontSize: 11, fontWeight: '600', color: colors.muted },
+  time: { fontSize: 16, fontWeight: '800', color: colors.ink },
+  preview: { width: '100%', height: 220, borderRadius: 14 },
   selfiePlaceholder: {
     minHeight: 132,
     alignItems: 'center',
@@ -274,7 +309,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: colors.paleBlue,
   },
-  placeholderTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
+  placeholderTitle: { fontSize: 14, fontWeight: '800', color: colors.ink },
 });
 
 export default WorkerAttendanceScreen;
