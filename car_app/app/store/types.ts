@@ -10,6 +10,13 @@ export type RelatedEntity =
       model?: string;
       imageUrl?: string;
       city?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+      status?: string;
+      color?: string;
+      carType?: string;
+      parkingSlot?: string;
     };
 
 export type Car = {
@@ -84,6 +91,8 @@ export type Booking = {
   societyId: RelatedEntity;
   flatId: RelatedEntity;
   carId: RelatedEntity;
+  customerId?: RelatedEntity;
+  workerId?: RelatedEntity;
   serviceId: RelatedEntity;
   slotId?: RelatedEntity;
   bookingDate: string;

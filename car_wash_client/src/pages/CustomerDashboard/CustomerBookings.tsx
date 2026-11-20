@@ -1153,6 +1153,78 @@ const CustomerBookings = ({
                   </div>
                 ))}
               </dl>
+              {typeof detailBooking.carId !== "string" ? (
+                <section className="space-y-3">
+                  <h3 className="font-semibold">Vehicle details</h3>
+                  {detailBooking.carId.imageUrl ? (
+                    <img
+                      src={detailBooking.carId.imageUrl}
+                      alt={`${labelOf(detailBooking.carId)} car`}
+                      className="h-48 w-full rounded-lg object-cover"
+                    />
+                  ) : null}
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                    {[
+                      ["Registration", detailBooking.carId.registrationNumber],
+                      [
+                        "Make / model",
+                        [detailBooking.carId.make, detailBooking.carId.model]
+                          .filter(Boolean)
+                          .join(" "),
+                      ],
+                      ["Color", detailBooking.carId.color],
+                      ["Vehicle type", detailBooking.carId.carType],
+                      ["Parking", detailBooking.carId.parkingSlot],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-slate-500">{label}</dt>
+                        <dd className="font-medium text-slate-900">{value || "—"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              ) : null}
+              {typeof detailBooking.workerId !== "string" &&
+              detailBooking.workerId ? (
+                <section className="space-y-3 rounded-lg border p-4">
+                  <h3 className="font-semibold">Assigned wash professional</h3>
+                  <div className="flex items-center gap-3">
+                    {detailBooking.workerId.imageUrl ? (
+                      <img
+                        src={detailBooking.workerId.imageUrl}
+                        alt={`${detailBooking.workerId.name || "Worker"} profile`}
+                        className="h-14 w-14 rounded-full object-cover"
+                      />
+                    ) : null}
+                    <div className="min-w-0">
+                      <p className="font-semibold">
+                        {detailBooking.workerId.name || "Assigned worker"}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {detailBooking.workerId.status || "Worker"}
+                      </p>
+                    </div>
+                  </div>
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-slate-500">Phone</dt>
+                      <dd className="break-all font-medium">
+                        {detailBooking.workerId.phone || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Email</dt>
+                      <dd className="break-all font-medium">
+                        {detailBooking.workerId.email || "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+              ) : (
+                <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+                  A worker has not been assigned yet.
+                </p>
+              )}
               <section>
                 <h3 className="mb-2 font-semibold">Cleaning photos</h3>
                 <div className="grid grid-cols-2 gap-3">

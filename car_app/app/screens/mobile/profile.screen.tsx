@@ -1,5 +1,5 @@
 import React from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import {
   colors,
@@ -59,9 +59,13 @@ const ProfileScreen = () => {
       <View style={styles.profileHero}>
         <View style={styles.heroDecoration} />
         <View style={styles.heroTop}>
+        {profile?.imageUrl ? (
+          <Image source={{uri: profile.imageUrl}} style={styles.avatar} />
+        ) : (
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initials || 'CW'}</Text>
           </View>
+        )}
           <View style={styles.roleBadge}>
             <Feather
               name={isWorker ? 'briefcase' : 'user'}

@@ -12,7 +12,10 @@ import {
   View,
 } from 'react-native';
 import dayjs, {type Dayjs} from 'dayjs';
-import {launchCamera} from 'react-native-image-picker';
+import {
+  launchCamera,
+  launchImageLibrary,
+} from 'react-native-image-picker';
 import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
@@ -441,6 +444,9 @@ const JobCard = ({
       : `${job.carId.registrationNumber || ''} ${job.carId.make || ''} ${
           job.carId.model || ''
         }`.trim();
+  const carDetails = typeof job.carId === 'string' ? null : job.carId;
+  const customer =
+    typeof job.customerId === 'string' ? null : job.customerId;
   const location = [label(job.societyId), label(job.flatId)]
     .filter(Boolean)
     .join(' · ');
@@ -516,10 +522,13 @@ const JobCard = ({
     onAction('done');
   };
 
-  const capturePhoto = async (kind: 'beforePhoto' | 'afterPhoto') => {
+  const capturePhoto = async (
+    kind: 'beforePhoto' | 'afterPhoto',
+    source: 'camera' | 'library',
+  ) => {
     setPhotoError('');
     try {
-      if (Platform.OS === 'android') {
+      if (source === 'camera' && Platform.OS === 'android') {
         const permission = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.CAMERA,
         );
@@ -528,17 +537,25 @@ const JobCard = ({
           return;
         }
       }
-      const result = await launchCamera({
-        mediaType: 'photo',
-        cameraType: 'back',
-        quality: 0.5,
+      const options = {
+        mediaType: 'photo' as const,
+        selectionLimit: 1,
+        quality: 0.5 as const,
         maxWidth: 960,
         maxHeight: 960,
         includeBase64: true,
-        saveToPhotos: false,
-      });
+        assetRepresentationMode: 'compatible' as const,
+      };
+      const result =
+        source === 'camera'
+          ? await launchCamera({
+              ...options,
+              cameraType: 'back',
+              saveToPhotos: false,
+            })
+          : await launchImageLibrary(options);
       if (result.didCancel) return;
-      if (result.errorCode) {
+      if (result.errorCode || result.errorMessage) {
         setPhotoError(result.errorMessage || 'Camera could not be opened.');
         return;
       }
@@ -548,7 +565,10 @@ const JobCard = ({
         return;
       }
       const photo = `data:${asset.type};base64,${asset.base64}`;
-      if (photo.length > 2_800_000) {
+      if (
+        (asset.fileSize !== undefined && asset.fileSize > 2 * 1024 * 1024) ||
+        photo.length > 2_800_000
+      ) {
         setPhotoError('Photo is too large. Please take another photo.');
         return;
       }
@@ -558,6 +578,14 @@ const JobCard = ({
         error instanceof Error ? error.message : 'Camera could not be opened.',
       );
     }
+  };
+
+  const choosePhoto = (kind: 'beforePhoto' | 'afterPhoto') => {
+    Alert.alert('Cleaning photo', 'Take a photo or choose one from your gallery.', [
+      {text: 'Take photo', onPress: () => { capturePhoto(kind, 'camera'); }},
+      {text: 'Choose from gallery', onPress: () => { capturePhoto(kind, 'library'); }},
+      {text: 'Cancel', style: 'cancel'},
+    ]);
   };
 
   return (
@@ -604,6 +632,16 @@ const JobCard = ({
               value={`${formatTimelineTime(job.bookingDate)} · ${job.bookingTime}`}
             />
             <DetailRow title="Vehicle" value={car || '—'} />
+            {carDetails?.imageUrl ? (
+              <Image
+                source={{uri: carDetails.imageUrl}}
+                style={styles.vehiclePhoto}
+                resizeMode="cover"
+              />
+            ) : null}
+            <DetailRow title="Color" value={carDetails?.color || '—'} />
+            <DetailRow title="Vehicle type" value={carDetails?.carType || '—'} />
+            <DetailRow title="Parking" value={carDetails?.parkingSlot || '—'} />
             <DetailRow title="Society / flat" value={location || '—'} />
             <DetailRow title="Booking status" value={job.status} />
             <DetailRow title="Work status" value={workStatus} />
@@ -631,6 +669,32 @@ const JobCard = ({
               />
             ) : null}
             <DetailRow title="Booking note" value={job.remarks || 'No booking note'} />
+          </View>
+
+          <View style={styles.detailsSection}>
+            <Text style={styles.sectionTitle}>Customer details</Text>
+            {customer ? (
+              <>
+                <View style={styles.customerIdentity}>
+                  {customer.imageUrl ? (
+                    <Image
+                      source={{uri: customer.imageUrl}}
+                      style={styles.customerAvatar}
+                    />
+                  ) : (
+                    <View style={[styles.customerAvatar, styles.customerAvatarPlaceholder]}>
+                      <Feather name="user" size={19} color={colors.primary} />
+                    </View>
+                  )}
+                  <Text style={styles.title}>{customer.name || 'Customer'}</Text>
+                </View>
+                <DetailRow title="Phone" value={customer.phone || '—'} />
+                <DetailRow title="Email" value={customer.email || '—'} />
+                <DetailRow title="Address" value={customer.address || '—'} />
+              </>
+            ) : (
+              <Text style={styles.copy}>Customer details are unavailable.</Text>
+            )}
           </View>
 
           <View style={styles.detailsSection}>
@@ -751,7 +815,7 @@ const JobCard = ({
               {!job.beforePhoto ? (
                 <ActionButton
                   title="Take before-cleaning photo"
-                  onPress={() => capturePhoto('beforePhoto')}
+                  onPress={() => choosePhoto('beforePhoto')}
                   disabled={progressDisabled || !isBookingDateToday}
                   variant="secondary"
                 />
@@ -825,7 +889,7 @@ const JobCard = ({
               <ActionButton
                 title="Take after-cleaning photo"
                 variant="secondary"
-                onPress={() => capturePhoto('afterPhoto')}
+                onPress={() => choosePhoto('afterPhoto')}
                 disabled={progressDisabled || !isBookingDateToday}
               />
               <TextField
@@ -907,6 +971,10 @@ const styles = StyleSheet.create({
   timelineToggleText: {fontSize: 13, fontWeight: '700', color: colors.primary},
   timeline: {gap: 10, borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 12},
   detailsSection: {gap: 6, paddingBottom: 8},
+  vehiclePhoto: {width: '100%', height: 150, borderRadius: 12, backgroundColor: colors.canvas},
+  customerIdentity: {flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5},
+  customerAvatar: {width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas},
+  customerAvatarPlaceholder: {alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paleBlue},
   sectionTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
   detailRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
   detailLabel: {flex: 1, fontSize: 12, color: colors.muted},

@@ -21,6 +21,13 @@ export type BookingReference =
       make?: string;
       model?: string;
       imageUrl?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+      status?: string;
+      color?: string;
+      carType?: string;
+      parkingSlot?: string;
     };
 
 export type BookingNew = {
@@ -28,6 +35,8 @@ export type BookingNew = {
   societyId: BookingReference;
   flatId: BookingReference;
   carId: BookingReference;
+  customerId?: BookingReference;
+  workerId?: BookingReference;
   serviceId: BookingReference;
   membershipId?: BookingReference;
   bookingDate: string;

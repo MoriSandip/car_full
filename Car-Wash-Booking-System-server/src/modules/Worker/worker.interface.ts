@@ -10,6 +10,7 @@ export type TWorker = {
   password: string;
   status: keyof typeof WORKER_STATUS;
   address?: string;
+  imageUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
 };

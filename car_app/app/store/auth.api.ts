@@ -23,6 +23,10 @@ type CustomerRegisterPayload = {
   phone: string;
   password: string;
   address?: string;
+  profileImage?: {
+    image: string;
+    mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+  };
 };
 type PasswordResetRole = 'CUSTOMER' | 'WORKER';
 type PasswordResetRequest = {email: string; role: PasswordResetRole};

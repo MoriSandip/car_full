@@ -374,7 +374,7 @@ const getBookings = async (params: ListParams) => {
       .populate('serviceId')
       .populate('slotId')
       .populate('membershipId')
-      .populate('workerId', 'name email phone status')
+      .populate('workerId', 'name email phone status imageUrl')
       .sort({ bookingDate: -1, bookingTime: 1 })
       .skip((page - 1) * limit)
       .limit(limit),
@@ -409,7 +409,7 @@ const getBookingById = async (id: string, customerId?: string) => {
     .populate('serviceId')
     .populate('slotId')
     .populate('membershipId')
-    .populate('workerId', 'name email phone status');
+    .populate('workerId', 'name email phone status imageUrl');
 
   if (!booking) throw new Error('Booking not found');
 
@@ -949,7 +949,7 @@ const assignWorkerToBooking = async (
       runValidators: true,
     },
   )
-    .populate('workerId', 'name email phone status')
+    .populate('workerId', 'name email phone status imageUrl')
     .populate('carId')
     .populate('societyId')
     .populate('flatId')
@@ -1226,7 +1226,7 @@ const unassignWorkerFromBooking = async (bookingId: string) => {
       runValidators: true,
     },
   )
-    .populate('workerId', 'name email phone status')
+    .populate('workerId', 'name email phone status imageUrl')
     .populate('carId')
     .populate('societyId')
     .populate('flatId')

@@ -8,6 +8,7 @@ export type AppUser = {
   email: string;
   phone?: string;
   address?: string;
+  imageUrl?: string;
   role: AppRole;
   status?: string;
   createdAt?: string;

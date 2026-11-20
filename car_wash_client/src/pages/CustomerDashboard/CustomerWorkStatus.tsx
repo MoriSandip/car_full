@@ -288,6 +288,47 @@ const CustomerWorkStatus = () => {
                   </div>
                 ))}
               </dl>
+              {typeof selectedBooking.workerId !== "string" &&
+              selectedBooking.workerId ? (
+                <section className="space-y-3 rounded-lg border p-4">
+                  <h3 className="font-semibold">Assigned wash professional</h3>
+                  <div className="flex items-center gap-3">
+                    {selectedBooking.workerId.imageUrl ? (
+                      <img
+                        src={selectedBooking.workerId.imageUrl}
+                        alt={`${selectedBooking.workerId.name || "Worker"} profile`}
+                        className="h-14 w-14 rounded-full object-cover"
+                      />
+                    ) : null}
+                    <div>
+                      <p className="font-semibold">
+                        {selectedBooking.workerId.name || "Assigned worker"}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {selectedBooking.workerId.status || "Worker"}
+                      </p>
+                    </div>
+                  </div>
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-slate-500">Phone</dt>
+                      <dd className="break-all font-medium">
+                        {selectedBooking.workerId.phone || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Email</dt>
+                      <dd className="break-all font-medium">
+                        {selectedBooking.workerId.email || "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+              ) : (
+                <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+                  A worker has not been assigned yet.
+                </p>
+              )}
 
               <section>
                 <h3 className="mb-2 flex items-center gap-2 font-semibold">

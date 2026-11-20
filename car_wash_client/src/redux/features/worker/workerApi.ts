@@ -10,6 +10,7 @@ export interface TWorker {
   phone: string;
   status: TWorkerStatus;
   address?: string;
+  imageUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -21,6 +22,7 @@ export type TWorkerPayload = {
   password?: string;
   status: TWorkerStatus;
   address?: string;
+  imageUrl?: string;
 };
 
 export type WorkerCashTransaction = {

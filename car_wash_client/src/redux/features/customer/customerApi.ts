@@ -6,6 +6,7 @@ export type TCustomer = {
   email: string;
   phone: string;
   address?: string;
+  imageUrl?: string;
   status: 'ACTIVE' | 'INACTIVE';
   createdAt?: string;
   updatedAt?: string;
@@ -17,6 +18,10 @@ export type TCustomerRegisterPayload = {
   phone: string;
   password: string;
   address?: string;
+  profileImage?: {
+    image: string;
+    mimeType: "image/jpeg" | "image/png" | "image/webp";
+  };
 };
 
 export type TCustomerLoginPayload = {

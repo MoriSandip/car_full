@@ -18,6 +18,7 @@ const createWorkerValidationSchema = z.object({
     password: z.string().min(8, 'Password must be at least 8 characters'),
     status: z.nativeEnum(WORKER_STATUS).optional(),
     address: z.string().optional(),
+    imageUrl: z.string().trim().url().max(2048).optional().or(z.literal('')),
   }),
 });
 
@@ -29,6 +30,7 @@ const updateWorkerValidationSchema = z.object({
     password: z.string().min(8).optional(),
     status: z.nativeEnum(WORKER_STATUS).optional(),
     address: z.string().optional(),
+    imageUrl: z.string().trim().url().max(2048).optional().or(z.literal('')),
   }).refine(
     (data) => Object.keys(data).length > 0,
     'At least one field is required',

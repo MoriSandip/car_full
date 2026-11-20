@@ -8,6 +8,7 @@ export interface ICustomer {
   phone: string;
   password: string;
   address?: string;
+  imageUrl?: string;
   role: "CUSTOMER";
   status: "ACTIVE" | "INACTIVE";
 }
@@ -33,6 +34,11 @@ const customerSchema = new Schema<ICustomer>(
       unique: true,
     },
     address: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    imageUrl: {
       type: String,
       trim: true,
       default: '',

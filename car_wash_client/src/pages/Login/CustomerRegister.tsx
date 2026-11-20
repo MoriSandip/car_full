@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Loader2, UserRound, Mail, Phone, MapPin, Lock } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +27,18 @@ const CustomerRegister: React.FC = () => {
     password: "",
     confirmPassword: "",
   });
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profilePreview, setProfilePreview] = useState("");
+
+  useEffect(() => {
+    if (!profileImage) {
+      setProfilePreview("");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(profileImage);
+    setProfilePreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [profileImage]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -49,14 +61,40 @@ const CustomerRegister: React.FC = () => {
       toast.error("Password must be at least 6 characters");
       return;
     }
+    if (
+      profileImage &&
+      (!["image/jpeg", "image/png", "image/webp"].includes(profileImage.type) ||
+        profileImage.size > 5 * 1024 * 1024)
+    ) {
+      toast.error("Choose a JPEG, PNG, or WebP profile photo up to 5 MB.");
+      return;
+    }
 
     try {
+      let encodedProfileImage:
+        | {image: string; mimeType: "image/jpeg" | "image/png" | "image/webp"}
+        | undefined;
+      if (profileImage) {
+        const bytes = new Uint8Array(await profileImage.arrayBuffer());
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        }
+        encodedProfileImage = {
+          image: btoa(binary),
+          mimeType: profileImage.type as
+            | "image/jpeg"
+            | "image/png"
+            | "image/webp",
+        };
+      }
       const response = await registerCustomer({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formData.phone.trim(),
         address: formData.address.trim(),
         password: formData.password,
+        ...(encodedProfileImage ? {profileImage: encodedProfileImage} : {}),
       }).unwrap();
 
       toast.success(response?.message || "Registration successful");
@@ -155,6 +193,25 @@ const CustomerRegister: React.FC = () => {
                   autoComplete="street-address"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="profileImage">Profile photo (optional)</Label>
+              <Input
+                id="profileImage"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) =>
+                  setProfileImage(event.target.files?.[0] ?? null)
+                }
+              />
+              {profilePreview ? (
+                <img
+                  src={profilePreview}
+                  alt="Selected profile preview"
+                  className="h-20 w-20 rounded-full object-cover"
+                />
+              ) : null}
             </div>
 
             <div className="space-y-2">

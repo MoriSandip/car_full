@@ -112,6 +112,17 @@ type TBooking = {
     model?: string;
     carNumber?: string;
     registrationNumber?: string;
+    make?: string;
+    imageUrl?: string;
+    color?: string;
+    carType?: string;
+    parkingSlot?: string;
+  } | string;
+  customerId?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
     imageUrl?: string;
   } | string;
 
@@ -1131,6 +1142,14 @@ const AssignedBookings: React.FC = () => {
                                     {getObjectName(booking.societyId)} · Flat{" "}
                                     {getFlatName(booking.flatId)}
                                   </p>
+                                  {typeof booking.carId !== "string" &&
+                                  booking.carId ? (
+                                    <p className="text-sm text-muted-foreground">
+                                      {[booking.carId.color, booking.carId.carType, booking.carId.parkingSlot]
+                                        .filter(Boolean)
+                                        .join(" · ") || "No additional vehicle details"}
+                                    </p>
+                                  ) : null}
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                   <div>
@@ -1185,6 +1204,45 @@ const AssignedBookings: React.FC = () => {
                                     </div>
                                   ) : null}
                                 </div>
+
+                                <section className="space-y-2 rounded-md border p-3">
+                                  <h3 className="font-semibold">Customer details</h3>
+                                  {typeof booking.customerId !== "string" &&
+                                  booking.customerId ? (
+                                    <>
+                                      <div className="flex items-center gap-3">
+                                        {booking.customerId.imageUrl ? (
+                                          <img
+                                            src={booking.customerId.imageUrl}
+                                            alt={`${booking.customerId.name || "Customer"} profile`}
+                                            className="h-12 w-12 rounded-full object-cover"
+                                          />
+                                        ) : null}
+                                        <p className="font-medium">
+                                          {booking.customerId.name || "Customer"}
+                                        </p>
+                                      </div>
+                                      <div className="grid gap-2 text-sm sm:grid-cols-2">
+                                        <p>
+                                          <span className="text-muted-foreground">Phone: </span>
+                                          {booking.customerId.phone || "—"}
+                                        </p>
+                                        <p className="break-all">
+                                          <span className="text-muted-foreground">Email: </span>
+                                          {booking.customerId.email || "—"}
+                                        </p>
+                                        <p className="sm:col-span-2">
+                                          <span className="text-muted-foreground">Address: </span>
+                                          {booking.customerId.address || "—"}
+                                        </p>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">
+                                      Customer details are unavailable.
+                                    </p>
+                                  )}
+                                </section>
 
                                 <div>
                                   <p className="mb-2 font-medium">Cleaning photos</p>

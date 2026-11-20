@@ -43,7 +43,13 @@ export type WorkerCashTransaction = {
       model?: string;
     };
   };
-  customerId?: {name?: string; email?: string; phone?: string};
+  customerId?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    imageUrl?: string;
+  };
   amount: number;
   currency: string;
   provider: 'Cash';

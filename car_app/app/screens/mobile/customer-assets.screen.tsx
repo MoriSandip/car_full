@@ -1,13 +1,20 @@
 import React, {useState} from 'react';
 import {
+  Alert,
   Image,
+  PermissionsAndroid,
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import {launchImageLibrary, type Asset} from 'react-native-image-picker';
+import {
+  launchCamera,
+  launchImageLibrary,
+  type Asset,
+} from 'react-native-image-picker';
 import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
@@ -261,36 +268,65 @@ const CustomerAssetsScreen = ({route}: Props) => {
     }
   };
 
-  const chooseCarImage = async () => {
+  const pickCarImage = async (source: 'camera' | 'library') => {
     setError('');
-    const result = await launchImageLibrary({
-      mediaType: 'photo',
-      selectionLimit: 1,
-      includeBase64: true,
-      quality: 0.7,
-      maxWidth: 1280,
-      maxHeight: 1280,
-    });
-    if (result.didCancel) return;
-    if (result.errorMessage) {
-      setError(result.errorMessage);
-      return;
+    try {
+      if (source === 'camera' && Platform.OS === 'android') {
+        const permission = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+        );
+        if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+          setError('Camera permission is required to take a car photo.');
+          return;
+        }
+      }
+      const options = {
+        mediaType: 'photo' as const,
+        selectionLimit: 1,
+        includeBase64: true,
+        quality: 0.7 as const,
+        maxWidth: 1280,
+        maxHeight: 1280,
+        assetRepresentationMode: 'compatible' as const,
+      };
+      const result =
+        source === 'camera'
+          ? await launchCamera({...options, cameraType: 'back', saveToPhotos: false})
+          : await launchImageLibrary(options);
+      if (result.didCancel) return;
+      if (result.errorCode || result.errorMessage) {
+        setError(result.errorMessage || 'Could not open the photo picker.');
+        return;
+      }
+      const asset = result.assets?.[0];
+      if (!asset?.uri || !asset.base64) {
+        setError('Could not read the selected image. Please choose another one.');
+        return;
+      }
+      if (!asset.type?.match(/^image\/(jpeg|png|webp)$/)) {
+        setError('Choose a JPEG, PNG, or WebP car image.');
+        return;
+      }
+      if (
+        (asset.fileSize !== undefined && asset.fileSize > 5 * 1024 * 1024) ||
+        asset.base64.length > 7_000_000
+      ) {
+        setError('Car image must be 5 MB or smaller.');
+        return;
+      }
+      setPickedCarImage(asset);
+      setCarImagePreview(asset.uri);
+    } catch (pickerError) {
+      setError(errorText(pickerError));
     }
-    const asset = result.assets?.[0];
-    if (!asset?.uri || !asset.base64) {
-      setError('Could not read the selected image. Please choose another one.');
-      return;
-    }
-    if (!asset.type?.match(/^image\/(jpeg|png|webp)$/)) {
-      setError('Choose a JPEG, PNG, or WebP car image.');
-      return;
-    }
-    if (asset.base64.length > 7_000_000) {
-      setError('Car image must be 5 MB or smaller.');
-      return;
-    }
-    setPickedCarImage(asset);
-    setCarImagePreview(asset.uri);
+  };
+
+  const chooseCarImage = () => {
+    Alert.alert('Car photo', 'Take a photo or choose one from your gallery.', [
+      {text: 'Take photo', onPress: () => { pickCarImage('camera'); }},
+      {text: 'Choose from gallery', onPress: () => { pickCarImage('library'); }},
+      {text: 'Cancel', style: 'cancel'},
+    ]);
   };
 
   const removeFlat = async (flat: Flat) => {

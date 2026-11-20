@@ -3,9 +3,15 @@ import httpStatus from 'http-status';
 import { Customer } from './customer.model';
 import { TCustomer } from './customer.interface';
 import mongoose from 'mongoose';
+import { ImageUploadService } from '../Upload/imageUpload.service';
 
 const registerCustomerIntoDB = async (
-  payload: Pick<TCustomer, 'name' | 'email' | 'phone' | 'password' | 'address'>,
+  payload: Pick<TCustomer, 'name' | 'email' | 'phone' | 'password' | 'address'> & {
+    profileImage?: {
+      image: string;
+      mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+    };
+  },
 ) => {
   const email = payload.email.trim().toLowerCase();
   const phone = payload.phone.trim();
@@ -25,6 +31,15 @@ const registerCustomerIntoDB = async (
     throw error;
   }
 
+  const imageUrl = payload.profileImage
+    ? (
+        await ImageUploadService.uploadImage(
+          payload.profileImage.image,
+          payload.profileImage.mimeType,
+        )
+      ).url
+    : '';
+
   // Role and status are not taken from the public request.
   const customer = await Customer.create({
     name: payload.name.trim(),
@@ -32,6 +47,7 @@ const registerCustomerIntoDB = async (
     phone,
     password: payload.password,
     address: payload.address ?? '',
+    imageUrl,
     status: 'ACTIVE',
   });
 
@@ -167,6 +183,7 @@ const updateCustomerInDB = async (
   if (email) customer.email = email;
   if (phone) customer.phone = phone;
   if (payload.address !== undefined) customer.address = payload.address.trim();
+  if (payload.imageUrl !== undefined) customer.imageUrl = payload.imageUrl;
   if (payload.status !== undefined) customer.status = payload.status;
 
   await customer.save();

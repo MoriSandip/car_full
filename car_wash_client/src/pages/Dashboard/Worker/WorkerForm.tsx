@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import imageUpload from "@/utils/ImageUp";
 
 import {
   Select,
@@ -35,6 +36,7 @@ const defaultForm: TWorkerPayload = {
   password: "",
   status: "ACTIVE",
   address: "",
+  imageUrl: "",
 };
 
 const getErrorMessage = (error: any) =>
@@ -53,6 +55,19 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
     ...defaultForm,
   });
   const [error, setError] = useState("");
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profilePreview, setProfilePreview] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  useEffect(() => {
+    if (!profileImage) {
+      setProfilePreview(form.imageUrl || "");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(profileImage);
+    setProfilePreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [profileImage, form.imageUrl]);
 
   const isView = mode === "view";
 
@@ -60,6 +75,7 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
     if (!initialData) {
       setForm({ ...defaultForm });
       setError("");
+      setProfileImage(null);
       return;
     }
 
@@ -70,9 +86,11 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
       password: "",
       status: initialData.status || "ACTIVE",
       address: initialData.address || "",
+      imageUrl: initialData.imageUrl || "",
     });
 
     setError("");
+    setProfileImage(null);
   }, [initialData, mode]);
 
   const updateField = <K extends keyof TWorkerPayload>(
@@ -121,6 +139,7 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
       phone,
       status: form.status,
       address: form.address?.trim() || "",
+      imageUrl: form.imageUrl || "",
     };
 
     if (mode === "add" || form.password) {
@@ -128,9 +147,23 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
     }
 
     try {
+      if (profileImage) {
+        if (
+          !["image/jpeg", "image/png", "image/webp"].includes(profileImage.type) ||
+          profileImage.size > 5 * 1024 * 1024
+        ) {
+          setError("Choose a JPEG, PNG, or WebP profile photo up to 5 MB.");
+          return;
+        }
+        setIsUploadingImage(true);
+        const uploaded = await imageUpload(profileImage);
+        payload.imageUrl = uploaded.data.url;
+      }
       await onSubmit(payload);
     } catch (err: any) {
       setError(getErrorMessage(err));
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -206,6 +239,26 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="worker-profile-image">Profile photo</Label>
+          <Input
+            id="worker-profile-image"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={isView}
+            onChange={(event) =>
+              setProfileImage(event.target.files?.[0] ?? null)
+            }
+          />
+          {profilePreview ? (
+            <img
+              src={profilePreview}
+              alt={`${form.name || "Worker"} profile`}
+              className="h-16 w-16 rounded-full object-cover"
+            />
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
           <Label>Account Status *</Label>
           <Select
             value={form.status}
@@ -251,8 +304,10 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
         </Button>
 
         {!isView && (
-          <Button type="submit" disabled={loading}>
-            {loading
+          <Button type="submit" disabled={loading || isUploadingImage}>
+            {isUploadingImage
+              ? "Uploading photo..."
+              : loading
               ? "Saving..."
               : mode === "edit"
                 ? "Update Worker"

@@ -38,15 +38,23 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to the Car Wash service on your local network.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Take a selfie to record your worker attendance.</string>
+	<string>Take a profile photo, car photo, or worker attendance selfie.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a profile photo, car photo, or cleaning photo from your photo library.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>
 	<array>
-		<string>MaterialIcons.ttf</string>
-		<string>MaterialCommunityIcons.ttf</string>
+		<string>AntDesign.ttf</string>
+		<string>EvilIcons.ttf</string>
+		<string>Feather.ttf</string>
 		<string>FontAwesome.ttf</string>
-		<string>Handlee-Regular.ttf</string>
+		<string>Fontisto.ttf</string>
+		<string>Ionicons.ttf</string>
+		<string>MaterialCommunityIcons.ttf</string>
+		<string>MaterialIcons.ttf</string>
+		<string>Octicons.ttf</string>
+		<string>SimpleLineIcons.ttf</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

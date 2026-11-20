@@ -9,6 +9,7 @@ export type TCustomer = {
   password: string;
   status: keyof typeof CUSTOMER_STATUS;
   address?: string;
+  imageUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
 };

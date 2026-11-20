@@ -289,6 +289,7 @@ const getAssignedBookingsFromDB = async (
       .populate('societyId')
       .populate('flatId')
       .populate('carId')
+      .populate('customerId', 'name email phone address imageUrl')
       .populate('serviceId')
       .populate('membershipId', 'includedWashes usedWashes reservedWashes')
       .sort({ bookingDate: -1, bookingTime: 1 })

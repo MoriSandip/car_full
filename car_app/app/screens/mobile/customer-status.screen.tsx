@@ -225,6 +225,47 @@ const CustomerStatusScreen = () => {
                     title="Amount"
                     value={`₹${Number(selectedBooking.amountPayable || 0).toFixed(2)}`}
                   />
+                  {typeof selectedBooking.carId !== 'string' ? (
+                    <>
+                      {selectedBooking.carId.imageUrl ? (
+                        <Image
+                          source={{uri: selectedBooking.carId.imageUrl}}
+                          style={styles.detailCarImage}
+                        />
+                      ) : null}
+                      <Detail
+                        title="Color / type"
+                        value={[
+                          selectedBooking.carId.color,
+                          selectedBooking.carId.carType,
+                        ].filter(Boolean).join(' · ')}
+                      />
+                      <Detail
+                        title="Parking"
+                        value={selectedBooking.carId.parkingSlot}
+                      />
+                    </>
+                  ) : null}
+                  {typeof selectedBooking.workerId === 'object' &&
+                  selectedBooking.workerId ? (
+                    <>
+                      <View style={styles.workerIdentity}>
+                        {selectedBooking.workerId.imageUrl ? (
+                          <Image
+                            source={{uri: selectedBooking.workerId.imageUrl}}
+                            style={styles.workerAvatar}
+                          />
+                        ) : null}
+                        <Text style={styles.cardTitle}>
+                          {selectedBooking.workerId.name || 'Assigned worker'}
+                        </Text>
+                      </View>
+                      <Detail title="Worker phone" value={selectedBooking.workerId.phone} />
+                      <Detail title="Worker email" value={selectedBooking.workerId.email} />
+                    </>
+                  ) : (
+                    <Detail title="Worker" value="Not assigned yet" />
+                  )}
                   <Detail
                     title="Worker notes"
                     value={selectedBooking.workerNotes || 'No notes'}
@@ -349,6 +390,9 @@ const styles = StyleSheet.create({
   bookingCard: {gap: 8, borderRadius: 14, paddingVertical: 11},
   row: {flexDirection: 'row', alignItems: 'center', gap: 8},
   carImage: {width: 62, height: 48, borderRadius: 8, backgroundColor: colors.canvas},
+  detailCarImage: {width: '100%', height: 140, borderRadius: 12, backgroundColor: colors.canvas},
+  workerIdentity: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  workerAvatar: {width: 38, height: 38, borderRadius: 19, backgroundColor: colors.canvas},
   flex: {flex: 1, minWidth: 0},
   cardTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
   body: {fontSize: 13, lineHeight: 19, color: colors.muted},

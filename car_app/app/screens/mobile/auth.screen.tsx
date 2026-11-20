@@ -1,12 +1,20 @@
 import React, {useState} from 'react';
 import {
+  Alert,
+  Image,
   KeyboardAvoidingView,
+  PermissionsAndroid,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {
+  launchCamera,
+  launchImageLibrary,
+  type Asset,
+} from 'react-native-image-picker';
 import {useDispatch} from 'react-redux';
 import {
   ActionButton,
@@ -53,6 +61,7 @@ const AuthScreen = ({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [profileImage, setProfileImage] = useState<Asset | null>(null);
   const [email, setEmail] = useState('');
   const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
   const [otpChannel, setOtpChannel] = useState<'email' | 'phone'>('email');
@@ -84,6 +93,72 @@ const AuthScreen = ({
     requestResetState.isLoading ||
     resetPasswordState.isLoading;
   const isOtpLoading = requestOtpState.isLoading || verifyOtpState.isLoading;
+
+  const selectProfileImage = async (source: 'camera' | 'library') => {
+    setError('');
+    try {
+      if (source === 'camera' && Platform.OS === 'android') {
+        const permission = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+        );
+        if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+          setError('Camera permission is required to take a profile photo.');
+          return;
+        }
+      }
+
+      const options = {
+        mediaType: 'photo' as const,
+        selectionLimit: 1,
+        includeBase64: true,
+        quality: 0.7 as const,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        assetRepresentationMode: 'compatible' as const,
+        saveToPhotos: false,
+      };
+      const result =
+        source === 'camera'
+          ? await launchCamera({...options, cameraType: 'front'})
+          : await launchImageLibrary(options);
+      if (result.didCancel) return;
+      if (result.errorCode) {
+        setError(result.errorMessage || 'Could not open the photo picker.');
+        return;
+      }
+      const asset = result.assets?.[0];
+      if (!asset?.uri || !asset.base64) {
+        setError('Could not read the selected photo. Please try another one.');
+        return;
+      }
+      if (!asset.type || !/^image\/(jpeg|png|webp)$/.test(asset.type)) {
+        setError('Choose a JPEG, PNG, or WebP profile photo.');
+        return;
+      }
+      if (
+        (asset.fileSize !== undefined && asset.fileSize > 5 * 1024 * 1024) ||
+        asset.base64.length > 7_000_000
+      ) {
+        setError('Profile photo must be 5 MB or smaller.');
+        return;
+      }
+      setProfileImage(asset);
+    } catch (pickerError) {
+      setError(
+        pickerError instanceof Error
+          ? pickerError.message
+          : 'Could not open the photo picker.',
+      );
+    }
+  };
+
+  const showProfileImageOptions = () => {
+    Alert.alert('Profile photo', 'Take a photo or choose one from your gallery.', [
+      {text: 'Take photo', onPress: () => { selectProfileImage('camera'); }},
+      {text: 'Choose from gallery', onPress: () => { selectProfileImage('library'); }},
+      {text: 'Cancel', style: 'cancel'},
+    ]);
+  };
 
   const changeRole = (nextRole: AppRole) => {
     setRole(nextRole);
@@ -212,6 +287,17 @@ const AuthScreen = ({
           phone: phone.trim(),
           address: address.trim(),
           password,
+          ...(profileImage?.base64 && profileImage.type
+            ? {
+                profileImage: {
+                  image: profileImage.base64,
+                  mimeType: profileImage.type as
+                    | 'image/jpeg'
+                    | 'image/png'
+                    | 'image/webp',
+                },
+              }
+            : {}),
         }).unwrap();
         setRegistering(false);
       }
@@ -325,6 +411,40 @@ const AuthScreen = ({
               autoCapitalize="words"
               returnKeyType="next"
             />
+          )}
+          {!recovering && registering && (
+            <View style={styles.profilePhotoSection}>
+              {profileImage?.uri ? (
+                <Image
+                  source={{uri: profileImage.uri}}
+                  style={styles.profilePhoto}
+                />
+              ) : (
+                <View style={styles.profilePhotoPlaceholder}>
+                  <Text style={styles.profilePhotoInitial}>
+                    {name.trim().charAt(0).toUpperCase() || 'U'}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.profilePhotoCopy}>
+                <Text style={styles.profilePhotoTitle}>Profile photo</Text>
+                <Text style={styles.profilePhotoHint}>Optional · JPEG, PNG or WebP</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={showProfileImageOptions}>
+                  <Text style={styles.footerLink}>
+                    {profileImage ? 'Change photo' : 'Take or choose photo'}
+                  </Text>
+                </Pressable>
+                {profileImage ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setProfileImage(null)}>
+                    <Text style={styles.profilePhotoRemove}>Remove photo</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
           )}
           {!recovering && !registering && loginMethod === 'otp' ? null : (
             <TextField
@@ -602,6 +722,30 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   brandName: {fontSize: 21, fontWeight: '800', color: colors.ink},
+  profilePhotoSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.canvas,
+  },
+  profilePhoto: {width: 64, height: 64, borderRadius: 32},
+  profilePhotoPlaceholder: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 32,
+    backgroundColor: colors.paleBlue,
+  },
+  profilePhotoInitial: {fontSize: 22, fontWeight: '800', color: colors.primary},
+  profilePhotoCopy: {flex: 1, gap: 4},
+  profilePhotoTitle: {fontSize: 14, fontWeight: '700', color: colors.ink},
+  profilePhotoHint: {fontSize: 12, color: colors.muted},
+  profilePhotoRemove: {fontSize: 13, fontWeight: '700', color: colors.danger},
   roleSwitch: {
     flexDirection: 'row',
     padding: 4,

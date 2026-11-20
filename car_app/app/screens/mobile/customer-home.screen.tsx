@@ -300,6 +300,9 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
     typeof booking.serviceId === 'string'
       ? booking.serviceId
       : booking.serviceId?._id ?? '';
+  const car = typeof booking.carId === 'string' ? null : booking.carId;
+  const worker =
+    typeof booking.workerId === 'string' ? null : booking.workerId;
   const availabilityRange = singleDayAvailabilityRange(rescheduleDate);
   const slotsQuery = useGetAvailableSlotsQuery(
     {serviceId, ...availabilityRange},
@@ -466,6 +469,49 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
                 title="Amount"
                 value={booking.amountPayable === 0 ? 'Covered by membership' : `₹${booking.amountPayable}`}
               />
+              <View style={styles.bookingDetailsSection}>
+                <Text style={styles.bookingDetailsHeading}>Vehicle details</Text>
+                {car?.imageUrl ? (
+                  <Image
+                    source={{uri: car.imageUrl}}
+                    style={styles.vehicleDetailImage}
+                    resizeMode="cover"
+                  />
+                ) : null}
+                <DetailRow title="Registration" value={car?.registrationNumber || '—'} />
+                <DetailRow
+                  title="Make / model"
+                  value={[car?.make, car?.model].filter(Boolean).join(' ') || '—'}
+                />
+                <DetailRow title="Color" value={car?.color || '—'} />
+                <DetailRow title="Vehicle type" value={car?.carType || '—'} />
+                <DetailRow title="Parking" value={car?.parkingSlot || '—'} />
+              </View>
+              <View style={styles.bookingDetailsSection}>
+                <Text style={styles.bookingDetailsHeading}>Wash professional</Text>
+                {worker ? (
+                  <>
+                    <View style={styles.workerIdentity}>
+                      {worker.imageUrl ? (
+                        <Image
+                          source={{uri: worker.imageUrl}}
+                          style={styles.workerAvatar}
+                        />
+                      ) : (
+                        <View style={[styles.workerAvatar, styles.workerAvatarPlaceholder]}>
+                          <Feather name="user" size={20} color={colors.primary} />
+                        </View>
+                      )}
+                      <Text style={styles.workerName}>{worker.name || 'Assigned worker'}</Text>
+                    </View>
+                    <DetailRow title="Phone" value={worker.phone || '—'} />
+                    <DetailRow title="Email" value={worker.email || '—'} />
+                    <DetailRow title="Status" value={worker.status || '—'} />
+                  </>
+                ) : (
+                  <Text style={styles.body}>A worker has not been assigned yet.</Text>
+                )}
+              </View>
               {booking.paymentType === 'Individual' &&
               booking.paymentMethod !== 'Cash' &&
               booking.paymentStatus !== 'Paid' &&
@@ -939,6 +985,13 @@ const styles = StyleSheet.create({
   detailRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
   detailLabel: {flex: 1, fontSize: 12, color: colors.muted},
   detailValue: {flex: 1, textAlign: 'right', fontSize: 12, color: colors.ink, fontWeight: '600'},
+  bookingDetailsSection: {gap: 7, paddingVertical: 8},
+  bookingDetailsHeading: {fontSize: 14, fontWeight: '800', color: colors.ink},
+  vehicleDetailImage: {width: '100%', height: 150, borderRadius: 12, backgroundColor: colors.canvas},
+  workerIdentity: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  workerAvatar: {width: 46, height: 46, borderRadius: 23, backgroundColor: colors.canvas},
+  workerAvatarPlaceholder: {alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paleBlue},
+  workerName: {fontSize: 14, fontWeight: '700', color: colors.ink},
   timelineEntry: {borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 10, gap: 2},
   datePicker: {backgroundColor: colors.white, padding: 18, borderRadius: 16, gap: 12},
 });

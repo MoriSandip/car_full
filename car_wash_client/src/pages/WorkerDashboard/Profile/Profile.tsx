@@ -29,6 +29,7 @@ type TWorkerProfile = {
   city?: string;
   state?: string;
   profileImage?: string;
+  imageUrl?: string;
   image?: string;
   status?: string;
   role?: string;
@@ -181,9 +182,9 @@ export default function Profile() {
           <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end">
               <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-blue-100 text-2xl font-bold text-blue-700 shadow-sm sm:h-28 sm:w-28">
-                {worker.profileImage || worker.image ? (
+                {worker.imageUrl || worker.profileImage || worker.image ? (
                   <img
-                    src={worker.profileImage || worker.image}
+                    src={worker.imageUrl || worker.profileImage || worker.image}
                     alt={name}
                     className="h-full w-full object-cover"
                   />

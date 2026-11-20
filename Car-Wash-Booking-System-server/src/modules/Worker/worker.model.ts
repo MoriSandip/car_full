@@ -38,6 +38,11 @@ const workerSchema = new Schema<TWorker, IWorkerModel>(
       type: String,
       trim: true,
     },
+    imageUrl: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
   {
     timestamps: true,
