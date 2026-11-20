@@ -162,6 +162,12 @@ export const customerApi = api.injectEndpoints({
         normalizeList(response),
       providesTags: ['Cars'],
     }),
+    uploadImage: builder.mutation<
+      ApiEnvelope<{url: string}>,
+      {image: string; mimeType: string}
+    >({
+      query: body => ({url: '/uploads/images', method: 'POST', body}),
+    }),
     createCustomerCar: builder.mutation<ApiEnvelope<Car>, CarPayload>({
       query: body => ({url: '/cars', method: 'POST', body}),
       invalidatesTags: ['Cars'],
@@ -370,6 +376,7 @@ export const customerApi = api.injectEndpoints({
 export const {
   useGetCustomerProfileQuery,
   useGetMyCarsQuery,
+  useUploadImageMutation,
   useCreateCustomerCarMutation,
   useUpdateCustomerCarMutation,
   useDeleteCustomerCarMutation,

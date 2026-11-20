@@ -5,6 +5,7 @@ import {Provider} from 'react-redux';
 import {NavigationContainer} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
+import Feather from 'react-native-vector-icons/Feather';
 
 import {NavigatorParamList} from './navigation-route';
 import {colors} from '../theme/colors';
@@ -30,9 +31,26 @@ import WorkerAttendanceReportScreen from '../screens/mobile/worker-attendance-re
 import ProfileScreen from '../screens/mobile/profile.screen';
 import ApiRequestUi from '../components/mobile/api-request-ui';
 import PaymentReturnHandler from '../components/mobile/payment-return-handler';
+import {MobileDrawerProvider} from '../components/mobile/ui';
 
 const Stack = createStackNavigator<NavigatorParamList>();
 const Tab = createBottomTabNavigator<NavigatorParamList>();
+
+const HomeTabIcon = ({color, size}: {color: string; size: number}) => (
+  <Feather name="home" color={color} size={size} />
+);
+const BookingTabIcon = ({color, size}: {color: string; size: number}) => (
+  <Feather name="plus-circle" color={color} size={size} />
+);
+const ProfileTabIcon = ({color, size}: {color: string; size: number}) => (
+  <Feather name="user" color={color} size={size} />
+);
+const JobsTabIcon = ({color, size}: {color: string; size: number}) => (
+  <Feather name="briefcase" color={color} size={size} />
+);
+const ClockTabIcon = ({color, size}: {color: string; size: number}) => (
+  <Feather name="clock" color={color} size={size} />
+);
 
 const CustomerTabs = () => (
   <Tab.Navigator
@@ -40,47 +58,36 @@ const CustomerTabs = () => (
       headerShown: false,
       tabBarActiveTintColor: colors.primary,
       tabBarInactiveTintColor: colors.gray,
-      tabBarStyle: {height: 62, paddingBottom: 8, paddingTop: 6},
+      tabBarStyle: styles.tabBar,
+      tabBarLabelStyle: styles.tabLabel,
+      tabBarItemStyle: styles.tabItem,
     }}>
     <Tab.Screen
       name="CustomerDashboard"
       component={CustomerHomeScreen}
-      options={{title: 'Home', tabBarLabel: 'Home'}}
+      options={{
+        title: 'Home',
+        tabBarLabel: 'Home',
+        tabBarIcon: HomeTabIcon,
+      }}
     />
     <Tab.Screen
       name="CustomerBooking"
       component={CustomerBookingScreen}
-      options={{title: 'Book wash', tabBarLabel: 'Book'}}
-    />
-    <Tab.Screen
-      name="CustomerBookings"
-      component={CustomerBookingsScreen}
-      options={{title: 'My bookings', tabBarLabel: 'Bookings'}}
-    />
-    <Tab.Screen
-      name="CustomerTransactions"
-      component={CustomerPaymentHistoryScreen}
-      options={{title: 'Payment history', tabBarLabel: 'Payments'}}
-    />
-    <Tab.Screen
-      name="CustomerStatus"
-      component={CustomerStatusScreen}
-      options={{title: 'Cleaning status', tabBarLabel: 'Status'}}
-    />
-    <Tab.Screen
-      name="CustomerMemberships"
-      component={CustomerMembershipsScreen}
-      options={{title: 'Memberships', tabBarLabel: 'Plans'}}
-    />
-    <Tab.Screen
-      name="CustomerAssets"
-      component={CustomerAssetsScreen}
-      options={{title: 'My home & cars', tabBarLabel: 'My setup'}}
+      options={{
+        title: 'Book wash',
+        tabBarLabel: 'Booking',
+        tabBarIcon: BookingTabIcon,
+      }}
     />
     <Tab.Screen
       name="CustomerProfile"
       component={ProfileScreen}
-      options={{title: 'Profile', tabBarLabel: 'Profile'}}
+      options={{
+        title: 'Profile',
+        tabBarLabel: 'Profile',
+        tabBarIcon: ProfileTabIcon,
+      }}
     />
   </Tab.Navigator>
 );
@@ -91,34 +98,68 @@ const WorkerTabs = () => (
       headerShown: false,
       tabBarActiveTintColor: colors.primary,
       tabBarInactiveTintColor: colors.gray,
-      tabBarStyle: {height: 62, paddingBottom: 8, paddingTop: 6},
+      tabBarStyle: styles.tabBar,
+      tabBarLabelStyle: styles.tabLabel,
+      tabBarItemStyle: styles.tabItem,
     }}>
     <Tab.Screen
       name="WorkerDashboard"
       component={WorkerHomeScreen}
-      options={{title: 'Overview', tabBarLabel: 'Overview'}}
+      options={{
+        title: 'Overview',
+        tabBarLabel: 'Home',
+        tabBarIcon: HomeTabIcon,
+      }}
     />
     <Tab.Screen
       name="WorkerJobs"
       component={WorkerJobsScreen}
-      options={{title: 'Assigned jobs', tabBarLabel: 'My jobs'}}
+      options={{
+        title: 'Assigned jobs',
+        tabBarLabel: 'Jobs',
+        tabBarIcon: JobsTabIcon,
+      }}
     />
     <Tab.Screen
       name="WorkerAttendance"
       component={WorkerAttendanceScreen}
-      options={{title: 'Punch in/out', tabBarLabel: 'Punch'}}
-    />
-    <Tab.Screen
-      name="WorkerAttendanceReport"
-      component={WorkerAttendanceReportScreen}
-      options={{title: 'Attendance report', tabBarLabel: 'Report'}}
-    />
-    <Tab.Screen
-      name="WorkerProfile"
-      component={ProfileScreen}
-      options={{title: 'Profile', tabBarLabel: 'Profile'}}
+      options={{
+        title: 'Punch in/out',
+        tabBarLabel: 'Punch',
+        tabBarIcon: ClockTabIcon,
+      }}
     />
   </Tab.Navigator>
+);
+
+const CustomerFlow = () => (
+  <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Screen name="CustomerMain" component={CustomerTabs} />
+    <Stack.Screen
+      name="CustomerTransactions"
+      component={CustomerPaymentHistoryScreen}
+    />
+    <Stack.Screen name="CustomerBookings" component={CustomerBookingsScreen} />
+    <Stack.Screen name="CustomerStatus" component={CustomerStatusScreen} />
+    <Stack.Screen
+      name="CustomerMemberships"
+      component={CustomerMembershipsScreen}
+    />
+    <Stack.Screen name="CustomerSociety" component={CustomerAssetsScreen} />
+    <Stack.Screen name="CustomerFlat" component={CustomerAssetsScreen} />
+    <Stack.Screen name="CustomerCar" component={CustomerAssetsScreen} />
+  </Stack.Navigator>
+);
+
+const WorkerFlow = () => (
+  <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Screen name="WorkerMain" component={WorkerTabs} />
+    <Stack.Screen
+      name="WorkerAttendanceReport"
+      component={WorkerAttendanceReportScreen}
+    />
+    <Stack.Screen name="WorkerProfile" component={ProfileScreen} />
+  </Stack.Navigator>
 );
 
 const AppFlow = () => {
@@ -188,10 +229,10 @@ const AppFlow = () => {
   }
 
   if (token && user?.role === 'CUSTOMER') {
-    return <CustomerTabs />;
+    return <CustomerFlow />;
   }
   if (token && user?.role === 'WORKER') {
-    return <WorkerTabs />;
+    return <WorkerFlow />;
   }
 
   return (
@@ -204,7 +245,9 @@ const AppFlow = () => {
 export const AppNavigator = () => (
   <Provider store={store}>
     <NavigationContainer>
-      <AppFlow />
+      <MobileDrawerProvider>
+        <AppFlow />
+      </MobileDrawerProvider>
     </NavigationContainer>
     <ApiRequestUi />
     <PaymentReturnHandler />
@@ -214,4 +257,21 @@ export const AppNavigator = () => (
 const styles = StyleSheet.create({
   loading: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   loadingText: {marginTop: 10, color: colors.gray},
+  tabBar: {
+    height: 70,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingTop: 7,
+    paddingBottom: 8,
+    backgroundColor: colors.white,
+    borderTopWidth: 0,
+    borderRadius: 23,
+    elevation: 14,
+    shadowColor: '#153244',
+    shadowOffset: {width: 0, height: 7},
+    shadowOpacity: 0.13,
+    shadowRadius: 14,
+  },
+  tabLabel: {fontSize: 11, fontWeight: '700', marginTop: 2},
+  tabItem: {paddingVertical: 2},
 });

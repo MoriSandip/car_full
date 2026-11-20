@@ -1,5 +1,14 @@
 import React, {useState} from 'react';
-import {Alert, Linking, Pressable, StyleSheet, Text, View} from 'react-native';
+import {
+  Alert,
+  Linking,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
   Card,
@@ -14,10 +23,6 @@ import {
   useGetMyPaymentTransactionsQuery,
 } from '../../store/customer.api';
 import type {CustomerPaymentTransaction} from '../../store/customer.api';
-import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
-import {NavigatorParamList} from '../../navigators/navigation-route';
-
-type Props = BottomTabScreenProps<NavigatorParamList, 'CustomerTransactions'>;
 type ProviderFilter = '' | 'Stripe' | 'Cash' | 'UPI';
 type StatusFilter = '' | 'Pending' | 'Paid' | 'Failed' | 'Refunded';
 
@@ -70,13 +75,24 @@ const PaymentRow = ({
       : '';
   return (
     <Card style={styles.transactionCard}>
-      <View style={styles.row}>
-        <Text style={styles.amount}>{formatMoney(transaction.amount)}</Text>
+      <View style={styles.transactionHeader}>
+        <View style={styles.amountGroup}>
+          <View style={styles.providerIcon}>
+            <Feather
+              name={transaction.provider === 'Cash' ? 'dollar-sign' : 'credit-card'}
+              size={17}
+              color={colors.primary}
+            />
+          </View>
+          <Text style={styles.amount}>{formatMoney(transaction.amount)}</Text>
+        </View>
         <Text
           style={[
             styles.status,
             transaction.status === 'Paid' && styles.paid,
             transaction.status === 'Failed' && styles.failed,
+            transaction.status === 'Pending' && styles.pending,
+            transaction.status === 'Refunded' && styles.refunded,
           ]}>
           {transaction.status}
         </Text>
@@ -113,7 +129,7 @@ const PaymentRow = ({
   );
 };
 
-const CustomerPaymentHistoryScreen = (_props: Props) => {
+const CustomerPaymentHistoryScreen = () => {
   const [page, setPage] = useState(1);
   const [provider, setProvider] = useState<ProviderFilter>('');
   const [status, setStatus] = useState<StatusFilter>('');
@@ -152,13 +168,30 @@ const CustomerPaymentHistoryScreen = (_props: Props) => {
   };
 
   return (
-    <Page>
-      <PageTitle
+    <Page
+      refreshControl={
+        <RefreshControl
+          refreshing={isFetching}
+          onRefresh={() => {
+            refetch();
+          }}
+          tintColor={colors.primary}
+        />
+      }>
+      <PageTitle compact
         title="Payment history"
         subtitle="Review online and cash payments for your bookings and memberships."
       />
       <Card style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Payment summary</Text>
+        <View style={styles.summaryHeader}>
+          <View style={styles.summaryIcon}>
+            <Feather name="credit-card" size={17} color={colors.primary} />
+          </View>
+          <View>
+            <Text style={styles.summaryTitle}>Payment summary</Text>
+            <Text style={styles.summaryHint}>Your transactions at a glance</Text>
+          </View>
+        </View>
         <View style={styles.summaryGrid}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Total paid</Text>
@@ -186,13 +219,6 @@ const CustomerPaymentHistoryScreen = (_props: Props) => {
           </View>
         </View>
       </Card>
-
-      <ActionButton
-        title={isFetching ? 'Refreshing...' : 'Refresh transactions'}
-        variant="secondary"
-        disabled={isFetching}
-        onPress={() => refetch()}
-      />
 
       <View style={styles.filterBlock}>
         <Text style={styles.filterHeading}>Payment method</Text>
@@ -236,7 +262,15 @@ const CustomerPaymentHistoryScreen = (_props: Props) => {
           />
         ))
       ) : (
-        <InfoMessage text="No transactions match these filters." />
+        <Card style={styles.emptyCard}>
+          <View style={styles.emptyIcon}>
+            <Feather name="credit-card" size={20} color={colors.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>No transactions found</Text>
+          <Text style={styles.emptyCopy}>
+            Try changing the payment method or status filters.
+          </Text>
+        </Card>
       )}
 
       <View style={styles.pagination}>
@@ -283,12 +317,28 @@ const FilterChip = ({
 );
 
 const styles = StyleSheet.create({
-  summaryCard: {gap: 12},
+  summaryCard: {gap: 14, borderRadius: 19},
+  summaryHeader: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  summaryIcon: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: colors.paleBlue,
+  },
   summaryTitle: {fontSize: 16, fontWeight: '800', color: colors.ink},
-  summaryGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
-  summaryItem: {width: '47%', gap: 4},
-  summaryLabel: {fontSize: 12, color: colors.muted},
-  summaryValue: {fontSize: 16, fontWeight: '800', color: colors.ink},
+  summaryHint: {marginTop: 2, fontSize: 11, color: colors.muted},
+  summaryGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 9},
+  summaryItem: {
+    width: '48%',
+    gap: 5,
+    padding: 11,
+    borderRadius: 13,
+    backgroundColor: colors.canvas,
+  },
+  summaryLabel: {fontSize: 11, fontWeight: '600', color: colors.muted},
+  summaryValue: {fontSize: 15, fontWeight: '800', color: colors.ink},
   filterBlock: {gap: 9},
   filterHeading: {fontSize: 13, fontWeight: '700', color: colors.ink},
   filters: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
@@ -303,12 +353,37 @@ const styles = StyleSheet.create({
   chipSelected: {backgroundColor: colors.paleBlue, borderColor: colors.primary},
   chipText: {fontSize: 12, fontWeight: '600', color: colors.muted},
   chipTextSelected: {color: colors.primaryDark},
-  transactionCard: {gap: 8},
-  row: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
-  amount: {fontSize: 18, fontWeight: '800', color: colors.ink},
-  status: {fontSize: 12, fontWeight: '700', color: colors.muted},
-  paid: {color: colors.success},
-  failed: {color: colors.danger},
+  transactionCard: {gap: 9, borderRadius: 18},
+  transactionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  amountGroup: {flexDirection: 'row', alignItems: 'center', gap: 9},
+  providerIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+    backgroundColor: colors.paleBlue,
+  },
+  amount: {fontSize: 18, fontWeight: '900', color: colors.ink},
+  status: {
+    overflow: 'hidden',
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: colors.canvas,
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.muted,
+  },
+  paid: {color: colors.success, backgroundColor: '#E8F5EE'},
+  failed: {color: colors.danger, backgroundColor: '#FDECEA'},
+  pending: {color: '#A15C00', backgroundColor: '#FFF4E5'},
+  refunded: {color: '#6941C6', backgroundColor: '#F4EBFF'},
   transactionTitle: {fontSize: 15, fontWeight: '700', color: colors.ink},
   copy: {fontSize: 12, lineHeight: 18, color: colors.muted},
   method: {fontSize: 12, fontWeight: '700', color: colors.primaryDark},
@@ -327,6 +402,17 @@ const styles = StyleSheet.create({
   },
   pageButton: {flex: 1},
   pageText: {fontSize: 12, color: colors.muted},
+  emptyCard: {alignItems: 'flex-start', gap: 10, borderRadius: 18},
+  emptyIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.paleBlue,
+  },
+  emptyTitle: {fontSize: 15, fontWeight: '800', color: colors.ink},
+  emptyCopy: {fontSize: 13, lineHeight: 19, color: colors.muted},
 });
 
 export default CustomerPaymentHistoryScreen;

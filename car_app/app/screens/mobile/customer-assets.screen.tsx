@@ -1,6 +1,14 @@
 import React, {useState} from 'react';
-import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {launchImageLibrary, type Asset} from 'react-native-image-picker';
+import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
   Card,
@@ -24,41 +32,23 @@ import {
   useGetMyCarsQuery,
   useGetMyFlatsQuery,
   useGetMySocietiesQuery,
+  useUploadImageMutation,
   useUpdateCustomerCarMutation,
   useUpdateCustomerFlatMutation,
 } from '../../store/customer.api';
 import {Car, Flat, RelatedEntity, Society} from '../../store/types';
 import {useAppSelector} from '../../store/hooks';
+import {StackScreenProps} from '@react-navigation/stack';
+import {NavigatorParamList} from '../../navigators/navigation-route';
+import {BottomSheet} from '../../components/bottomSheet/BottomSheet';
 
 type Section = 'society' | 'flat' | 'car';
+type AssetRouteName = 'CustomerSociety' | 'CustomerFlat' | 'CustomerCar';
+type Props = StackScreenProps<NavigatorParamList, AssetRouteName>;
 
 const errorText = (error: unknown) => {
   const value = error as {data?: {message?: string}; message?: string};
   return value.data?.message || value.message || 'Request could not be completed.';
-};
-
-const uploadCarImage = async (asset: Asset) => {
-  if (!asset.base64 || !asset.type?.match(/^image\/(jpeg|png|webp)$/)) {
-    throw new Error('Choose a JPEG, PNG, or WebP car image.');
-  }
-  if (asset.base64.length > 7_000_000) {
-    throw new Error('Car image must be 5 MB or smaller.');
-  }
-
-  const body = new FormData();
-  body.append('image', asset.base64);
-  const response = await fetch(
-    'https://api.imgbb.com/1/upload?key=1bdaaa38f74328b09cbb9edd361599b8',
-    {method: 'POST', body},
-  );
-  const result = (await response.json()) as {
-    data?: {url?: string};
-    error?: {message?: string};
-  };
-  if (!response.ok || !result.data?.url) {
-    throw new Error(result.error?.message || 'Car image upload failed.');
-  }
-  return result.data.url;
 };
 
 const idOf = (entity: RelatedEntity | undefined) =>
@@ -101,8 +91,14 @@ const carDefaults: Omit<CarPayload, 'ownerName' | 'ownerPhone' | 'ownerEmail'> =
   description: '',
 };
 
-const CustomerAssetsScreen = () => {
-  const [section, setSection] = useState<Section>('society');
+const CustomerAssetsScreen = ({route}: Props) => {
+  const section: Section =
+    route.name === 'CustomerSociety'
+      ? 'society'
+      : route.name === 'CustomerFlat'
+        ? 'flat'
+        : 'car';
+  const [formVisible, setFormVisible] = useState(false);
   const [societyForm, setSocietyForm] = useState(societyDefaults);
   const [flatForm, setFlatForm] = useState(flatDefaults);
   const [carForm, setCarForm] = useState(carDefaults);
@@ -135,17 +131,12 @@ const CustomerAssetsScreen = () => {
   const [createCar, carMutation] = useCreateCustomerCarMutation();
   const [updateCar, carUpdateMutation] = useUpdateCustomerCarMutation();
   const [deleteCar, carDeleteMutation] = useDeleteCustomerCarMutation();
+  const [uploadImage] = useUploadImageMutation();
   const isLoading =
     societyQuery.isLoading ||
     flatQuery.isLoading ||
     carQuery.isLoading ||
     profileQuery.isLoading;
-
-  const changeSection = (next: Section) => {
-    setSection(next);
-    setError('');
-    setNotice('');
-  };
 
   const submitSociety = async () => {
     setError('');
@@ -163,6 +154,7 @@ const CustomerAssetsScreen = () => {
       }).unwrap();
       setSocietyForm(societyDefaults);
       setNotice('Society submitted. It will be available after admin verification.');
+      setFormVisible(false);
     } catch (requestError) {
       setError(errorText(requestError));
     }
@@ -192,6 +184,7 @@ const CustomerAssetsScreen = () => {
       }
       setFlatForm(flatDefaults);
       setEditingFlat(null);
+      setFormVisible(false);
     } catch (requestError) {
       setError(errorText(requestError));
     }
@@ -214,8 +207,19 @@ const CustomerAssetsScreen = () => {
     try {
       let imageUrl = carForm.imageUrl || '';
       if (pickedCarImage) {
+        const {base64, type} = pickedCarImage;
+        if (!base64 || !type?.match(/^image\/(jpeg|png|webp)$/)) {
+          throw new Error('Choose a JPEG, PNG, or WebP car image.');
+        }
+        if (base64.length > 7_000_000) {
+          throw new Error('Car image must be 5 MB or smaller.');
+        }
         setImageUploading(true);
-        imageUrl = await uploadCarImage(pickedCarImage);
+        const uploadedImage = await uploadImage({
+          image: base64,
+          mimeType: type,
+        }).unwrap();
+        imageUrl = uploadedImage.data.url;
       }
       const body = {
         ...carForm,
@@ -243,6 +247,7 @@ const CustomerAssetsScreen = () => {
       setPickedCarImage(null);
       setCarImagePreview('');
       setEditingCar(null);
+      setFormVisible(false);
     } catch (requestError) {
       setError(errorText(requestError));
     } finally {
@@ -256,7 +261,7 @@ const CustomerAssetsScreen = () => {
       mediaType: 'photo',
       selectionLimit: 1,
       includeBase64: true,
-      quality: 0.75,
+      quality: 0.7,
       maxWidth: 1280,
       maxHeight: 1280,
     });
@@ -305,7 +310,7 @@ const CustomerAssetsScreen = () => {
   };
 
   const startFlatEdit = (flat: Flat) => {
-    setSection('flat');
+    setFormVisible(true);
     setEditingFlat(flat._id);
     setFlatForm({
       societyId: idOf(flat.societyId),
@@ -322,7 +327,7 @@ const CustomerAssetsScreen = () => {
   };
 
   const startCarEdit = (car: Car) => {
-    setSection('car');
+    setFormVisible(true);
     setEditingCar(car._id);
     setCarForm({
       societyId: idOf(car.societyId),
@@ -343,11 +348,45 @@ const CustomerAssetsScreen = () => {
     setError('');
   };
 
+  const openCreateForm = () => {
+    setError('');
+    setNotice('');
+    setEditingFlat(null);
+    setEditingCar(null);
+    setSocietyForm(societyDefaults);
+    setFlatForm(flatDefaults);
+    setCarForm(carDefaults);
+    setPickedCarImage(null);
+    setCarImagePreview('');
+    setFormVisible(true);
+  };
+
   return (
-    <Page>
-      <PageTitle
-        title="My home & cars"
-        subtitle="Register your society, flat, and car. Verification status is shown here."
+    <Page
+      headerAction={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${section}`}
+          onPress={openCreateForm}
+          style={styles.addButton}>
+          <Feather name="plus" size={21} color={colors.white} />
+        </Pressable>
+      }>
+      <PageTitle compact
+        title={
+          section === 'society'
+            ? 'My society'
+            : section === 'flat'
+              ? 'My flats'
+              : 'My cars'
+        }
+        subtitle={
+          section === 'society'
+            ? 'Register your residential society and track its verification.'
+            : section === 'flat'
+              ? 'Add and manage the flats linked to your verified society.'
+              : 'Register your vehicles and keep their details up to date.'
+        }
       />
       {isLoading ? <LoadingMessage text="Loading your registrations..." /> : null}
       {societyQuery.isError || flatQuery.isError || carQuery.isError ? (
@@ -368,32 +407,26 @@ const CustomerAssetsScreen = () => {
           />
         </View>
       ) : null}
-      <View style={styles.sectionSwitch}>
-        {([
-          ['society', 'Society'],
-          ['flat', 'Flat'],
-          ['car', 'Car'],
-        ] as const).map(([value, label]) => (
-          <Pressable
-            key={value}
-            accessibilityRole="button"
-            accessibilityState={{selected: section === value}}
-            onPress={() => changeSection(value)}
-            style={[styles.sectionButton, section === value && styles.sectionButtonSelected]}>
-            <Text style={[styles.sectionButtonText, section === value && styles.sectionButtonTextSelected]}>
-              {label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {error ? <InfoMessage text={error} variant="error" /> : null}
-      {notice ? <InfoMessage text={notice} variant="success" /> : null}
+      {!formVisible && error ? <InfoMessage text={error} variant="error" /> : null}
+      {!formVisible && notice ? <InfoMessage text={notice} variant="success" /> : null}
 
       {section === 'society' ? (
         <>
-          <Card>
-            <Text style={styles.cardTitle}>Register a society</Text>
+          <ListHeading title="Registered societies" count={societies.length} />
+          <View style={styles.list}>
+            {societies.length ? societies.map(society => <SocietyCard key={society._id} society={society} />) : (
+              <EmptyRegistration
+                icon="home"
+                title="No society registered"
+                description="Add your society first. Once verified, you can register flats and cars."
+              />
+            )}
+          </View>
+          <FormSheet
+            visible={formVisible}
+            title="Register a society"
+            onClose={() => setFormVisible(false)}>
+            {error ? <InfoMessage text={error} variant="error" /> : null}
             <TextField placeholder="Society name *" value={societyForm.name} onChangeText={name => setSocietyForm({...societyForm, name})} />
             <TextField placeholder="Address *" value={societyForm.address} onChangeText={address => setSocietyForm({...societyForm, address})} />
             <TextField placeholder="City *" value={societyForm.city} onChangeText={city => setSocietyForm({...societyForm, city})} />
@@ -403,17 +436,29 @@ const CustomerAssetsScreen = () => {
             <TextField placeholder="Contact phone" value={societyForm.phone} onChangeText={phone => setSocietyForm({...societyForm, phone})} keyboardType="phone-pad" />
             <TextField placeholder="Contact email" value={societyForm.email} onChangeText={email => setSocietyForm({...societyForm, email})} keyboardType="email-address" autoCapitalize="none" />
             <ActionButton title={societyMutation.isLoading ? 'Submitting...' : 'Submit society'} onPress={submitSociety} disabled={societyMutation.isLoading} />
-          </Card>
-          <View style={styles.list}>
-            {societies.length ? societies.map(society => <SocietyCard key={society._id} society={society} />) : <InfoMessage text="No societies registered yet." />}
-          </View>
+          </FormSheet>
         </>
       ) : null}
 
       {section === 'flat' ? (
         <>
-          <Card>
-            <Text style={styles.cardTitle}>{editingFlat ? 'Edit flat' : 'Register a flat'}</Text>
+          <ListHeading title="Registered flats" count={flats.length} />
+          <View style={styles.list}>
+            {flats.length ? flats.map(flat => (
+              <FlatCard key={flat._id} flat={flat} onEdit={() => startFlatEdit(flat)} onDelete={() => removeFlat(flat)} busy={flatDeleteMutation.isLoading} />
+            )) : (
+              <EmptyRegistration
+                icon="grid"
+                title="No flats registered"
+                description="Register a flat in one of your verified societies to continue."
+              />
+            )}
+          </View>
+          <FormSheet
+            visible={formVisible}
+            title={editingFlat ? 'Edit flat' : 'Register a flat'}
+            onClose={() => setFormVisible(false)}>
+            {error ? <InfoMessage text={error} variant="error" /> : null}
             {approvedSocieties.length ? (
               <ChoiceList
                 title="Choose a verified society"
@@ -430,19 +475,19 @@ const CustomerAssetsScreen = () => {
             <TextField placeholder="Flat type (e.g. 2BHK) *" value={flatForm.flatType} onChangeText={flatType => setFlatForm({...flatForm, flatType})} />
             <TextField placeholder="Area (sq. ft.)" value={flatForm.area?.toString() ?? ''} onChangeText={value => setFlatForm({...flatForm, area: value ? Number(value) : undefined})} keyboardType="decimal-pad" />
             <ActionButton title={flatMutation.isLoading || flatUpdateMutation.isLoading ? 'Saving...' : editingFlat ? 'Save flat' : 'Submit flat'} onPress={submitFlat} disabled={!approvedSocieties.length || flatMutation.isLoading || flatUpdateMutation.isLoading} />
-            {editingFlat ? <ActionButton title="Cancel edit" variant="secondary" onPress={() => {setEditingFlat(null); setFlatForm(flatDefaults);}} /> : null}
-          </Card>
-          <View style={styles.list}>
-            {flats.length ? flats.map(flat => (
-              <FlatCard key={flat._id} flat={flat} onEdit={() => startFlatEdit(flat)} onDelete={() => removeFlat(flat)} busy={flatDeleteMutation.isLoading} />
-            )) : <InfoMessage text="No flats registered yet." />}
-          </View>
+            {editingFlat ? <ActionButton title="Cancel edit" variant="secondary" onPress={() => {setEditingFlat(null); setFlatForm(flatDefaults); setFormVisible(false);}} /> : null}
+          </FormSheet>
         </>
       ) : null}
 
       {section === 'car' ? (
         <>
-          <Card>
+          <FormSheet
+            visible={formVisible}
+            title={editingCar ? 'Edit car' : 'Register a car'}
+            onClose={() => setFormVisible(false)}>
+            {error ? <InfoMessage text={error} variant="error" /> : null}
+            <Card>
             <Text style={styles.cardTitle}>{editingCar ? 'Edit car' : 'Register a car'}</Text>
             {!approvedSocieties.length ? <InfoMessage text="A verified society is required before registering a car." /> : null}
             <ChoiceList
@@ -482,12 +527,20 @@ const CustomerAssetsScreen = () => {
             />
             <TextField placeholder="Parking slot (optional)" value={carForm.parkingSlot} onChangeText={parkingSlot => setCarForm({...carForm, parkingSlot})} />
             <ActionButton title={imageUploading ? 'Uploading image...' : carMutation.isLoading || carUpdateMutation.isLoading ? 'Saving...' : editingCar ? 'Save car' : 'Submit car'} onPress={submitCar} disabled={!approvedSocieties.length || imageUploading || carMutation.isLoading || carUpdateMutation.isLoading} />
-            {editingCar ? <ActionButton title="Cancel edit" variant="secondary" onPress={() => {setEditingCar(null); setCarForm(carDefaults); setPickedCarImage(null); setCarImagePreview('');}} /> : null}
-          </Card>
+            {editingCar ? <ActionButton title="Cancel edit" variant="secondary" onPress={() => {setEditingCar(null); setCarForm(carDefaults); setPickedCarImage(null); setCarImagePreview(''); setFormVisible(false);}} /> : null}
+            </Card>
+          </FormSheet>
+          <ListHeading title="Registered cars" count={cars.length} />
           <View style={styles.list}>
             {cars.length ? cars.map(car => (
               <CarCard key={car._id} car={car} onEdit={() => startCarEdit(car)} onDelete={() => removeCar(car)} busy={carDeleteMutation.isLoading} />
-            )) : <InfoMessage text="No cars registered yet." />}
+            )) : (
+              <EmptyRegistration
+                icon="truck"
+                title="No cars registered"
+                description="Add your car details to make it available for wash bookings."
+              />
+            )}
           </View>
         </>
       ) : null}
@@ -518,6 +571,62 @@ const ChoiceList = ({
       </View>
     ) : <Text style={styles.emptyChoice}>No verified options available.</Text>}
   </View>
+);
+
+const EmptyRegistration = ({
+  icon,
+  title,
+  description,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+}) => (
+  <Card style={styles.emptyRegistration}>
+    <View style={styles.emptyRegistrationIcon}>
+      <Feather name={icon} size={19} color={colors.primary} />
+    </View>
+    <Text style={styles.cardTitle}>{title}</Text>
+    <Text style={styles.detail}>{description}</Text>
+  </Card>
+);
+
+const ListHeading = ({title, count}: {title: string; count: number}) => (
+  <View style={styles.listHeading}>
+    <Text style={styles.listHeadingTitle}>{title}</Text>
+    <Text style={styles.listCount}>{count}</Text>
+  </View>
+);
+
+const FormSheet = ({
+  visible,
+  title,
+  onClose,
+  children,
+}: React.PropsWithChildren<{
+  visible: boolean;
+  title: string;
+  onClose: () => void;
+}>) => (
+  <BottomSheet visible={visible} setVisible={onClose}>
+    <View style={styles.formSheet}>
+      <View style={styles.formSheetHeader}>
+        <Text style={styles.formSheetTitle}>{title}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close form"
+          onPress={onClose}
+          style={styles.closeButton}>
+          <Feather name="x" size={19} color={colors.ink} />
+        </Pressable>
+      </View>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.formSheetContent}>
+        {children}
+      </ScrollView>
+    </View>
+  </BottomSheet>
 );
 
 const Status = ({value}: {value: string}) => (
@@ -575,12 +684,67 @@ const label = (value: RelatedEntity) => {
 };
 
 const styles = StyleSheet.create({
-  sectionSwitch: {flexDirection: 'row', gap: 8},
-  sectionButton: {flex: 1, minHeight: 44, borderRadius: 11, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white},
-  sectionButtonSelected: {borderColor: colors.primary, backgroundColor: colors.paleBlue},
-  sectionButtonText: {fontSize: 14, color: colors.muted, fontWeight: '700'},
-  sectionButtonTextSelected: {color: colors.primaryDark},
-  list: {gap: 12},
+  addButton: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: colors.primary,
+  },
+  list: {gap: 9},
+  listHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  listHeadingTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
+  listCount: {
+    minWidth: 22,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.primaryDark,
+    backgroundColor: colors.paleBlue,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  formSheet: {
+    maxHeight: '90%',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backgroundColor: colors.white,
+    paddingTop: 8,
+  },
+  formSheetHeader: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+  },
+  formSheetTitle: {fontSize: 17, fontWeight: '800', color: colors.ink},
+  closeButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: colors.canvas,
+  },
+  formSheetContent: {gap: 12, padding: 16, paddingBottom: 28},
+  emptyRegistration: {alignItems: 'flex-start', gap: 8, borderRadius: 15},
+  emptyRegistrationIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.paleBlue,
+  },
   cardHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8},
   cardTitle: {fontSize: 16, fontWeight: '800', color: colors.ink, flexShrink: 1},
   detail: {fontSize: 13, lineHeight: 19, color: colors.muted},
@@ -598,8 +762,8 @@ const styles = StyleSheet.create({
   emptyChoice: {fontSize: 13, color: colors.muted},
   actions: {flexDirection: 'row', gap: 8},
   action: {flex: 1},
-  carImage: {width: '100%', height: 170, borderRadius: 10, backgroundColor: colors.canvas},
-  carImagePreview: {width: '100%', height: 190, borderRadius: 12, backgroundColor: colors.canvas},
+  carImage: {width: '100%', height: 132, borderRadius: 10, backgroundColor: colors.canvas},
+  carImagePreview: {width: '100%', height: 160, borderRadius: 12, backgroundColor: colors.canvas},
 });
 
 export default CustomerAssetsScreen;

@@ -3,10 +3,13 @@ import {
   Image,
   Modal,
   Pressable,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
   Card,
@@ -114,31 +117,37 @@ const CustomerStatusScreen = () => {
   ).length;
 
   return (
-    <Page>
-      <PageTitle
+    <Page
+      refreshControl={
+        <RefreshControl
+          refreshing={isFetching}
+          onRefresh={() => {
+            refetch();
+          }}
+          tintColor={colors.primary}
+        />
+      }>
+      <PageTitle compact
         title="Cleaning status"
-        subtitle="Track worker updates, cleaning progress, and task timelines for your cars."
+        subtitle="Worker updates and cleaning timelines"
       />
       <View style={styles.stats}>
-        <Card style={styles.stat}>
-          <Text style={styles.statValue}>{isLoading ? '—' : bookings.length}</Text>
-          <Text style={styles.statLabel}>Wash tasks</Text>
-        </Card>
-        <Card style={styles.stat}>
-          <Text style={styles.statValue}>{isLoading ? '—' : activeCount}</Text>
-          <Text style={styles.statLabel}>In progress</Text>
-        </Card>
-        <Card style={styles.stat}>
-          <Text style={styles.statValue}>{isLoading ? '—' : completedCount}</Text>
-          <Text style={styles.statLabel}>Completed</Text>
-        </Card>
+        <StatusStat
+          icon="layers"
+          value={isLoading ? '—' : String(bookings.length)}
+          label="Wash tasks"
+        />
+        <StatusStat
+          icon="clock"
+          value={isLoading ? '—' : String(activeCount)}
+          label="In progress"
+        />
+        <StatusStat
+          icon="check-circle"
+          value={isLoading ? '—' : String(completedCount)}
+          label="Completed"
+        />
       </View>
-      <ActionButton
-        title={isFetching ? 'Refreshing...' : 'Refresh status'}
-        variant="secondary"
-        onPress={() => refetch()}
-        disabled={isFetching}
-      />
       {isLoading ? (
         <LoadingMessage text="Loading cleaning status..." />
       ) : isError ? (
@@ -182,7 +191,10 @@ const CustomerStatusScreen = () => {
           ))}
         </View>
       ) : (
-        <Card>
+        <Card style={styles.emptyCard}>
+          <View style={styles.emptyIcon}>
+            <Feather name="activity" size={20} color={colors.primary} />
+          </View>
           <Text style={styles.cardTitle}>No wash tasks yet</Text>
           <Text style={styles.body}>
             Worker progress and cleaning history will appear here after you book
@@ -214,7 +226,7 @@ const CustomerStatusScreen = () => {
               </Pressable>
             </View>
             {selectedBooking ? (
-              <View style={styles.modalContent}>
+              <ScrollView contentContainerStyle={styles.modalContent}>
                 <View style={styles.detailGrid}>
                   <Detail title="Service" value={selectedBooking.serviceNameSnapshot} />
                   <Detail title="Car" value={labelOf(selectedBooking.carId)} />
@@ -289,7 +301,7 @@ const CustomerStatusScreen = () => {
                   <Photo title="Before cleaning" uri={selectedBooking.beforePhoto} />
                   <Photo title="After cleaning" uri={selectedBooking.afterPhoto} />
                 </View>
-              </View>
+              </ScrollView>
             ) : null}
           </Card>
         </View>
@@ -303,6 +315,24 @@ const Detail = ({title, value}: {title: string; value?: string}) => (
     <Text style={styles.detailLabel}>{title}</Text>
     <Text style={styles.detailValue}>{value || '—'}</Text>
   </View>
+);
+
+const StatusStat = ({
+  icon,
+  value,
+  label,
+}: {
+  icon: string;
+  value: string;
+  label: string;
+}) => (
+  <Card style={styles.stat}>
+    <View style={styles.statIcon}>
+      <Feather name={icon} size={15} color={colors.primary} />
+    </View>
+    <Text style={styles.statValue}>{value}</Text>
+    <Text style={styles.statLabel}>{label}</Text>
+  </Card>
 );
 
 const Photo = ({title, uri}: {title: string; uri?: string}) => (
@@ -320,16 +350,38 @@ const Photo = ({title, uri}: {title: string; uri?: string}) => (
 
 const styles = StyleSheet.create({
   stats: {flexDirection: 'row', gap: 8},
-  stat: {flex: 1, alignItems: 'center', paddingVertical: 12, gap: 2},
-  statValue: {fontSize: 21, fontWeight: '800', color: colors.ink},
-  statLabel: {fontSize: 11, color: colors.muted, textAlign: 'center'},
+  stat: {flex: 1, alignItems: 'center', paddingVertical: 9, paddingHorizontal: 5, gap: 4, borderRadius: 13},
+  statIcon: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
+  },
+  statValue: {fontSize: 17, fontWeight: '800', color: colors.ink},
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.muted,
+    textAlign: 'center',
+  },
   list: {gap: 10},
-  bookingCard: {gap: 9},
+  bookingCard: {gap: 11, borderRadius: 18},
   row: {flexDirection: 'row', alignItems: 'flex-start', gap: 8},
   carImage: {width: 62, height: 48, borderRadius: 8, backgroundColor: colors.canvas},
   flex: {flex: 1},
   cardTitle: {fontSize: 15, fontWeight: '800', color: colors.ink},
   body: {fontSize: 13, lineHeight: 19, color: colors.muted},
+  emptyCard: {alignItems: 'flex-start', gap: 11, borderRadius: 18},
+  emptyIcon: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.paleBlue,
+  },
   badge: {
     overflow: 'hidden',
     borderRadius: 16,

@@ -26,8 +26,12 @@ jest.mock('@react-navigation/native', () => {
   return {
     NavigationContainer: ({children}: {children: React.ReactNode}) =>
       ReactModule.createElement(ReactModule.Fragment, null, children),
+    useNavigation: () => ({navigate: jest.fn()}),
+    useRoute: () => ({name: 'AuthScreen'}),
   };
 });
+
+jest.mock('react-native-vector-icons/Feather', () => 'Feather');
 
 jest.mock('@react-navigation/bottom-tabs', () => {
   const ReactModule = require('react');

@@ -5,11 +5,13 @@ import {
   Linking,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Feather from 'react-native-vector-icons/Feather';
 import DateTimePicker, {
   DateType,
   useDefaultStyles,
@@ -21,7 +23,6 @@ import {
   InfoMessage,
   LoadingMessage,
   Page,
-  PageTitle,
   TextField,
 } from '../../components/mobile/ui';
 import {BottomSheet} from '../../components/bottomSheet/BottomSheet';
@@ -60,67 +61,123 @@ const CustomerHomeScreen = ({navigation}: Props) => {
     .slice(0, 3);
 
   return (
-    <Page>
-      <PageTitle
-        title={`Hi ${user?.name?.split(' ')[0] || 'there'} 👋`}
-        subtitle="Your car wash, booked around your schedule."
-      />
-      <ActionButton
-        title="Book a car wash"
-        onPress={() => navigation.navigate('CustomerBooking')}
-      />
-      <ActionButton
-        title="Manage my society, flat & cars"
-        variant="secondary"
-        onPress={() => navigation.navigate('CustomerAssets')}
-      />
+    <Page
+      refreshControl={
+        <RefreshControl
+          refreshing={bookingsQuery.isFetching || carsQuery.isFetching}
+          onRefresh={() => {
+            bookingsQuery.refetch();
+            carsQuery.refetch();
+          }}
+          tintColor={colors.primary}
+        />
+      }>
+      <View style={styles.hero}>
+        <View style={styles.heroDecoration} />
+        <View style={styles.heroEyebrow}>
+          <Feather name="sun" size={13} color="#B5E4E2" />
+          <Text style={styles.heroEyebrowText}>CAR CARE, MADE EASY</Text>
+        </View>
+        <Text style={styles.heroTitle}>
+          Hi {user?.name?.trim().split(/\s+/)[0] || 'there'}
+        </Text>
+        <Text style={styles.heroSubtitle}>
+          Your next wash is just a few taps away.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('CustomerBooking')}
+          style={({pressed}) => [
+            styles.bookButton,
+            pressed && styles.heroButtonPressed,
+          ]}>
+          <Feather name="calendar" size={17} color={colors.primaryDark} />
+          <Text style={styles.bookButtonText}>Book a wash</Text>
+          <Feather
+            name="arrow-up-right"
+            size={17}
+            color={colors.primaryDark}
+          />
+        </Pressable>
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => navigation.navigate('CustomerSociety')}
+        style={({pressed}) => [
+          styles.assetsButton,
+          pressed && styles.assetsButtonPressed,
+        ]}>
+        <View style={styles.assetsIcon}>
+          <Feather name="truck" size={18} color={colors.primary} />
+        </View>
+        <View style={styles.assetsCopy}>
+          <Text style={styles.assetsTitle}>Set up home & cars</Text>
+          <Text style={styles.assetsSubtitle}>
+            Manage your location and vehicles
+          </Text>
+        </View>
+        <Feather name="chevron-right" size={19} color={colors.muted} />
+      </Pressable>
+
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionTitle}>Your activity</Text>
+        <Text style={styles.sectionCaption}>ALL TIME</Text>
+      </View>
       <View style={styles.stats}>
-        <Card style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {bookingsQuery.isLoading
-              ? '—'
-              : bookingsQuery.isError
-                ? '!'
-                : bookings.length}
-          </Text>
-          <Text style={styles.statLabel}>Bookings</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {bookingsQuery.isLoading
-              ? '—'
-              : bookingsQuery.isError
-                ? '!'
-                : pendingBookings}
-          </Text>
-          <Text style={styles.statLabel}>Pending</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {bookingsQuery.isLoading
-              ? '—'
-              : bookingsQuery.isError
-                ? '!'
-                : completedBookings}
-          </Text>
-          <Text style={styles.statLabel}>Completed</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {carsQuery.isLoading
-              ? '—'
-              : carsQuery.isError
-                ? '!'
-                : carsQuery.data?.data.length ?? 0}
-          </Text>
-          <Text style={styles.statLabel}>My cars</Text>
-        </Card>
+        <StatTile
+          icon="calendar"
+          label="Bookings"
+          value={bookingsQuery.isLoading
+            ? '—'
+            : bookingsQuery.isError
+              ? '!'
+              : String(bookings.length)}
+          tint="teal"
+        />
+        <StatTile
+          icon="clock"
+          label="Pending"
+          value={bookingsQuery.isLoading
+            ? '—'
+            : bookingsQuery.isError
+              ? '!'
+              : String(pendingBookings)}
+          tint="orange"
+        />
+        <StatTile
+          icon="check-circle"
+          label="Completed"
+          value={bookingsQuery.isLoading
+            ? '—'
+            : bookingsQuery.isError
+              ? '!'
+              : String(completedBookings)}
+          tint="green"
+        />
+        <StatTile
+          icon="truck"
+          label="My cars"
+          value={carsQuery.isLoading
+            ? '—'
+            : carsQuery.isError
+              ? '!'
+              : String(carsQuery.data?.data.length ?? 0)}
+          tint="blue"
+        />
       </View>
 
       <View style={styles.heading}>
-        <Text style={styles.sectionTitle}>Upcoming washes</Text>
-        <Pressable onPress={() => navigation.navigate('CustomerBookings')}>
+        <View style={styles.upcomingHeading}>
+          <Text style={styles.sectionTitle}>Upcoming washes</Text>
+          <Text style={styles.sectionCaption}>YOUR NEXT BOOKINGS</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('CustomerBookings')}
+          style={styles.viewAllButton}>
           <Text style={styles.link}>View all</Text>
+          <Feather name="arrow-right" size={15} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -129,18 +186,67 @@ const CustomerHomeScreen = ({navigation}: Props) => {
       ) : bookingsQuery.isError ? (
         <InfoMessage text="Bookings could not be loaded. Pull to refresh from My Bookings." variant="error" />
       ) : upcoming.length ? (
-        upcoming.map(booking => <BookingPreview key={booking._id} booking={booking} />)
+        upcoming.map(booking => (
+          <BookingPreview key={booking._id} booking={booking} />
+        ))
       ) : (
-        <Card>
+        <Card style={styles.emptyCard}>
+          <View style={styles.emptyIcon}>
+            <Feather name="calendar" size={20} color={colors.primary} />
+          </View>
           <Text style={styles.emptyTitle}>No upcoming washes</Text>
           <Text style={styles.body}>
             Pick a service, choose a day and book one of the available time slots.
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('CustomerBooking')}
+            style={styles.emptyAction}>
+            <Text style={styles.emptyActionText}>Plan your first wash</Text>
+            <Feather name="arrow-right" size={15} color={colors.primary} />
+          </Pressable>
         </Card>
       )}
     </Page>
   );
 };
+
+const statTints = {
+  teal: {background: '#E4F3F2', foreground: '#087F8C'},
+  orange: {background: '#FFF1E2', foreground: '#BE6A18'},
+  green: {background: '#E7F5EE', foreground: '#19805B'},
+  blue: {background: '#EAF0FF', foreground: '#526BC4'},
+};
+
+const StatTile = ({
+  icon,
+  label,
+  value,
+  tint,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  tint: keyof typeof statTints;
+}) => (
+  <Card style={styles.statTile}>
+    <View style={styles.statTileTop}>
+      <View
+        style={[
+          styles.statIcon,
+          {backgroundColor: statTints[tint].background},
+        ]}>
+        <Feather
+          name={icon}
+          size={16}
+          color={statTints[tint].foreground}
+        />
+      </View>
+      <Text style={styles.statNumber}>{value}</Text>
+    </View>
+    <Text style={styles.statLabel}>{label}</Text>
+  </Card>
+);
 
 const formatTimelineTime = (value?: string | null) => {
   if (!value) return '—';
@@ -278,16 +384,20 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
   };
 
   return (
-    <Card>
-      {typeof booking.carId !== 'string' && booking.carId.imageUrl ? (
-        <Image source={{uri: booking.carId.imageUrl}} style={styles.carImage} />
-      ) : null}
+    <Card style={styles.bookingPreview}>
       <View style={styles.row}>
         <Text style={styles.cardTitle}>
           {booking.serviceNameSnapshot || 'Car wash'}
         </Text>
         <Text style={styles.status}>{booking.status}</Text>
       </View>
+      <Text style={styles.body}>
+        {typeof booking.carId === 'string'
+          ? 'Car details unavailable'
+          : [booking.carId.registrationNumber, booking.carId.make, booking.carId.model]
+              .filter(Boolean)
+              .join(' ')}
+      </Text>
       <Text style={styles.body}>
         {new Date(booking.bookingDate).toLocaleDateString()} · {booking.bookingTime}
       </Text>
@@ -308,57 +418,8 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
           Completed: 'Completed',
         }[booking.workStatus || 'NotStarted']}
       </Text>
-      {booking.paymentMethod === 'Cash' ? (
-        <Text style={styles.body}>
-          Cash collection: {booking.cashCollectionStatus ||
-            (booking.paymentStatus === 'Paid' ? 'Received' : 'NotRecorded')}
-        </Text>
-      ) : null}
-      <View style={styles.photoRow}>
-        <View style={styles.photoItem}>
-          <Text style={styles.body}>Before cleaning</Text>
-          {booking.beforePhoto ? (
-            <Image source={{uri: booking.beforePhoto}} style={styles.photo} />
-          ) : (
-            <Text style={styles.photoPlaceholder}>Not uploaded</Text>
-          )}
-        </View>
-        <View style={styles.photoItem}>
-          <Text style={styles.body}>After cleaning</Text>
-          {booking.afterPhoto ? (
-            <Image source={{uri: booking.afterPhoto}} style={styles.photo} />
-          ) : (
-            <Text style={styles.photoPlaceholder}>Not uploaded</Text>
-          )}
-        </View>
-      </View>
-      <View style={styles.checklist}>
-        <Text style={styles.body}>Cleaning checklist</Text>
-        {[
-          ['Exterior wash', 'exteriorWash'],
-          ['Interior cleaning', 'interiorCleaning'],
-          ['Dashboard', 'dashboard'],
-          ['Tyre dressing', 'tyreDressing'],
-          ['Vacuum cleaning', 'vacuumCleaning'],
-        ].map(([label, key]) => {
-          const done = booking.cleaningChecklist?.[
-            key as keyof NonNullable<Booking['cleaningChecklist']>
-          ];
-          return (
-            <View key={key} style={styles.checklistRow}>
-              <Text style={styles.body}>{label}</Text>
-              <Text style={done ? styles.checklistDone : styles.checklistPending}>
-                {done ? 'Done' : 'Pending'}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-      {booking.workerNotes ? (
-        <Text style={styles.body}>Worker notes: {booking.workerNotes}</Text>
-      ) : null}
       <ActionButton
-        title="View full details & timeline"
+        title="Manage booking"
         variant="secondary"
         onPress={() => setDetailsVisible(true)}
       />
@@ -494,6 +555,52 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
                 title="Total working time"
                 value={formatWorkDuration(booking.totalWorkingSeconds)}
               />
+              {booking.status === 'Completed' ? (
+                booking.customerRating ? (
+                  <View style={styles.reviewSummary}>
+                    <Text style={styles.sectionTitle}>
+                      Your rating: {'★'.repeat(booking.customerRating)}
+                      {'☆'.repeat(5 - booking.customerRating)}
+                    </Text>
+                    {booking.customerReview ? (
+                      <Text style={styles.body}>{booking.customerReview}</Text>
+                    ) : null}
+                  </View>
+                ) : (
+                  <View style={styles.reviewForm}>
+                    <Text style={styles.sectionTitle}>Rate this cleaning</Text>
+                    <View style={styles.ratingRow}>
+                      {[1, 2, 3, 4, 5].map(value => (
+                        <Pressable
+                          key={value}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${value} stars`}
+                          accessibilityState={{selected: rating === value}}
+                          onPress={() => setRating(value)}>
+                          <Text style={styles.ratingStar}>
+                            {value <= rating ? '★' : '☆'}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <TextField
+                      placeholder="Write a review (optional)"
+                      value={review}
+                      onChangeText={setReview}
+                      multiline
+                      maxLength={1000}
+                    />
+                    {reviewError ? (
+                      <InfoMessage text={reviewError} variant="error" />
+                    ) : null}
+                    <ActionButton
+                      title={reviewState.isLoading ? 'Submitting...' : 'Submit review'}
+                      onPress={saveReview}
+                      disabled={reviewState.isLoading}
+                    />
+                  </View>
+                )
+              ) : null}
               <ActionButton
                 title="Close details"
                 variant="secondary"
@@ -524,10 +631,26 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
                 `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
               );
               setSelectedSlotId('');
+              setRescheduleError('');
               setRescheduling(current => !current);
             }}
           />
           {rescheduling ? (
+            <BottomSheet
+              visible={rescheduling}
+              setVisible={setRescheduling}>
+              <View style={styles.rescheduleSheet}>
+                <View style={styles.rescheduleHeader}>
+                  <Text style={styles.modalTitle}>Update booking</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Close reschedule form"
+                    onPress={() => setRescheduling(false)}
+                    style={styles.closeButton}>
+                    <Feather name="x" size={19} color={colors.ink} />
+                  </Pressable>
+                </View>
+                <ScrollView keyboardShouldPersistTaps="handled">
             <View style={styles.reschedulePanel}>
               <Pressable
                 onPress={() => setDatePickerVisible(true)}
@@ -560,57 +683,15 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
               {rescheduleError ? (
                 <InfoMessage text={rescheduleError} variant="error" />
               ) : null}
-              {booking.status === 'Completed' ? (
-                booking.customerRating ? (
-                  <View>
-                    <Text style={styles.body}>
-                      Your rating: {'★'.repeat(booking.customerRating)}
-                      {'☆'.repeat(5 - booking.customerRating)}
-                    </Text>
-                    {booking.customerReview ? (
-                      <Text style={styles.body}>{booking.customerReview}</Text>
-                    ) : null}
-                  </View>
-                ) : (
-                  <View style={styles.reschedulePanel}>
-                    <Text style={styles.body}>Rate this cleaning</Text>
-                    <View style={styles.ratingRow}>
-                      {[1, 2, 3, 4, 5].map(value => (
-                        <Pressable
-                          key={value}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${value} stars`}
-                          onPress={() => setRating(value)}>
-                          <Text style={styles.ratingStar}>
-                            {value <= rating ? '★' : '☆'}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <TextField
-                      placeholder="Write a review (optional)"
-                      value={review}
-                      onChangeText={setReview}
-                      multiline
-                      maxLength={1000}
-                    />
-                    {reviewError ? (
-                      <InfoMessage text={reviewError} variant="error" />
-                    ) : null}
-                    <ActionButton
-                      title={reviewState.isLoading ? 'Submitting...' : 'Submit review'}
-                      onPress={saveReview}
-                      disabled={reviewState.isLoading}
-                    />
-                  </View>
-                )
-              ) : null}
               <ActionButton
                 title={updateState.isLoading ? 'Saving...' : 'Save new schedule'}
                 onPress={saveReschedule}
                 disabled={!selectedSlotId || updateState.isLoading || slotsQuery.isFetching}
               />
             </View>
+                </ScrollView>
+              </View>
+            </BottomSheet>
           ) : null}
           <BottomSheet
             visible={datePickerVisible}
@@ -645,24 +726,161 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
 };
 
 const styles = StyleSheet.create({
+  hero: {
+    position: 'relative',
+    overflow: 'hidden',
+    gap: 8,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: colors.primaryDark,
+  },
+  heroDecoration: {
+    position: 'absolute',
+    top: -66,
+    right: -44,
+    width: 188,
+    height: 188,
+    borderRadius: 94,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  heroEyebrow: {flexDirection: 'row', alignItems: 'center', gap: 7},
+  heroEyebrowText: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.1,
+    color: '#B5E4E2',
+  },
+  heroTitle: {fontSize: 23, fontWeight: '800', color: colors.white},
+  heroSubtitle: {
+    marginTop: -4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: 'rgba(255,255,255,0.78)',
+  },
+  bookButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 6,
+    paddingHorizontal: 15,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+  },
+  bookButtonText: {flex: 1, fontSize: 14, fontWeight: '800', color: colors.primaryDark},
+  heroButtonPressed: {opacity: 0.8},
+  assetsButton: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 13,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 17,
+    backgroundColor: colors.white,
+    shadowColor: '#173044',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  assetsButtonPressed: {opacity: 0.8},
+  assetsIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: colors.paleBlue,
+  },
+  assetsCopy: {flex: 1, gap: 3},
+  assetsTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
+  assetsSubtitle: {fontSize: 11, color: colors.muted},
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  sectionCaption: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+    color: colors.muted,
+  },
   stats: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  statCard: {width: '48%', alignItems: 'center'},
-  statNumber: {fontSize: 26, fontWeight: '800', color: colors.primary},
-  statLabel: {fontSize: 13, color: colors.muted},
+  statTile: {
+    width: '48%',
+    minHeight: 78,
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 14,
+  },
+  statTileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statIcon: {
+    width: 29,
+    height: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+  },
+  statNumber: {fontSize: 20, fontWeight: '900', color: colors.ink},
+  statLabel: {fontSize: 11, fontWeight: '600', color: colors.muted},
   heading: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 2,
   },
+  upcomingHeading: {gap: 3},
   sectionTitle: {fontSize: 18, fontWeight: '800', color: colors.ink},
+  viewAllButton: {flexDirection: 'row', alignItems: 'center', gap: 5},
   link: {fontSize: 13, fontWeight: '700', color: colors.primary},
+  emptyCard: {alignItems: 'flex-start', borderRadius: 18},
+  emptyIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.paleBlue,
+  },
   row: {flexDirection: 'row', justifyContent: 'space-between', gap: 8},
+  bookingPreview: {gap: 7, borderRadius: 15, paddingVertical: 13},
   cardTitle: {fontSize: 15, fontWeight: '700', color: colors.ink, flex: 1},
   status: {fontSize: 12, fontWeight: '700', color: colors.primary},
   emptyTitle: {fontSize: 15, fontWeight: '700', color: colors.ink},
+  emptyAction: {flexDirection: 'row', alignItems: 'center', gap: 7},
+  emptyActionText: {fontSize: 13, fontWeight: '800', color: colors.primary},
   body: {fontSize: 13, lineHeight: 19, color: colors.muted},
-  reschedulePanel: {gap: 10},
+  reschedulePanel: {gap: 10, padding: 16, paddingBottom: 26},
+  rescheduleSheet: {
+    maxHeight: '90%',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backgroundColor: colors.white,
+    paddingTop: 8,
+  },
+  rescheduleHeader: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+  },
+  closeButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: colors.canvas,
+  },
   slotList: {gap: 8},
   photoRow: {flexDirection: 'row', gap: 10},
   carImage: {width: '100%', height: 150, borderRadius: 10, backgroundColor: colors.canvas, marginBottom: 8},
@@ -688,13 +906,18 @@ const styles = StyleSheet.create({
   checklistPending: {fontSize: 13, color: colors.muted},
   ratingRow: {flexDirection: 'row', gap: 6},
   ratingStar: {fontSize: 28, color: colors.primary},
+  reviewForm: {gap: 8},
+  reviewSummary: {gap: 5},
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 16,
+    justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  detailsModal: {maxHeight: '90%'},
+  detailsModal: {
+    maxHeight: '90%',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
   detailsModalContent: {gap: 10, paddingBottom: 8},
   modalTitle: {fontSize: 18, fontWeight: '800', color: colors.ink},
   detailRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},

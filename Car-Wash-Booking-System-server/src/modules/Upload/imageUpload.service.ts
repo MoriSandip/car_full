@@ -1,24 +1,28 @@
+import { Buffer } from 'node:buffer';
 import httpStatus from 'http-status';
 import AppError from '../../app/errors/AppError';
 import config from '../../app/config';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MIME_SIGNATURES: Record<string, (image: Buffer) => boolean> = {
-  'image/jpeg': (image) =>
+const MIME_SIGNATURES = {
+  'image/jpeg': (image: Buffer) =>
     image.length >= 3 &&
     image[0] === 0xff &&
     image[1] === 0xd8 &&
     image[2] === 0xff,
-  'image/png': (image) =>
+  'image/png': (image: Buffer) =>
     image.length >= 8 &&
     image.subarray(0, 8).equals(
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     ),
-  'image/webp': (image) =>
+  'image/webp': (image: Buffer) =>
     image.length >= 12 &&
     image.toString('ascii', 0, 4) === 'RIFF' &&
     image.toString('ascii', 8, 12) === 'WEBP',
 };
+const isAllowedMimeType = (
+  mimeType: string,
+): mimeType is keyof typeof MIME_SIGNATURES => mimeType in MIME_SIGNATURES;
 
 const uploadImage = async (base64Image: string, mimeType: string) => {
   const isValidBase64 =
@@ -26,7 +30,7 @@ const uploadImage = async (base64Image: string, mimeType: string) => {
     base64Image.length <= Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 4 &&
     /^[A-Za-z0-9+/]+={0,2}$/.test(base64Image) &&
     base64Image.length % 4 === 0;
-  if (!isValidBase64 || !MIME_SIGNATURES[mimeType]) {
+  if (!isValidBase64 || !isAllowedMimeType(mimeType)) {
     throw new AppError(httpStatus.BAD_REQUEST, 'Invalid image upload.');
   }
 
@@ -81,7 +85,7 @@ const uploadImage = async (base64Image: string, mimeType: string) => {
       'The image provider returned an invalid response.',
     );
   }
-  return result;
+  return { url: result.data.url };
 };
 
 export const ImageUploadService = { uploadImage };

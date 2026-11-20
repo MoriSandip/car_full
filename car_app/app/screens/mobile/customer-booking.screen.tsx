@@ -1,13 +1,15 @@
 import React, {useMemo, useState} from 'react';
 import {
   ActivityIndicator,
-  Image,
   Linking,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
   Card,
@@ -125,6 +127,7 @@ const CustomerBookingScreen = ({navigation}: Props) => {
     [dateRange, selectedSlots, slots],
   );
   const selectedCar = cars.find(car => car._id === carId);
+  const selectedService = services.find(service => service._id === serviceId);
   const membershipsForDates = useMemo(() => {
     if (!selectedCar || !startDate) return [];
     const membershipDates =
@@ -323,10 +326,23 @@ const CustomerBookingScreen = ({navigation}: Props) => {
 
   return (
     <Page>
-      <PageTitle
+      <PageTitle compact
         title="Book a wash"
         subtitle="Choose your car and service, then select a date range and a time for each available day."
       />
+
+      <View style={styles.bookingIntro}>
+        <View style={styles.introIcon}>
+          <Feather name="droplet" size={22} color={colors.white} />
+        </View>
+        <View style={styles.introCopy}>
+          <Text style={styles.introEyebrow}>MADE FOR YOUR SCHEDULE</Text>
+          <Text style={styles.introTitle}>A cleaner car, your way</Text>
+          <Text style={styles.introDescription}>
+            Pick a verified car, choose a wash, and book the time that suits you.
+          </Text>
+        </View>
+      </View>
 
       {servicesQuery.isLoading || carsQuery.isLoading ? (
         <LoadingMessage text="Loading cars and services..." />
@@ -345,83 +361,90 @@ const CustomerBookingScreen = ({navigation}: Props) => {
       ) : null}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>1. Select your car</Text>
+        <StepHeading step="01" title="Select your car" />
         {cars.length === 0 ? (
           <>
             <InfoMessage text="No verified active car is available. Register your society, flat, and car first; admin verification is required before booking." />
             <ActionButton
               title="Open my setup"
               variant="secondary"
-              onPress={() => navigation.navigate('CustomerAssets')}
+              onPress={() => navigation.navigate('CustomerSociety')}
             />
           </>
         ) : (
-          <View style={styles.choiceList}>
-            {cars.map(car => (
-              <ChoiceCard
-                key={car._id}
-                selected={carId === car._id}
-                title={`${car.registrationNumber} · ${car.make} ${car.model}`}
-                subtitle={entityLabel(car.flatId)}
-                imageUri={car.imageUrl}
-                onPress={() => {
-                  setCarId(car._id);
-                  setPaymentType('Individual');
-                  setMembershipId('');
-                }}
-              />
-            ))}
-          </View>
+          <SelectField
+            label="Vehicle"
+            placeholder="Choose a verified car"
+            icon="truck"
+            value={carId}
+            options={cars.map(car => ({
+              value: car._id,
+              label: `${car.registrationNumber} · ${car.make} ${car.model}`,
+              description: entityLabel(car.flatId),
+            }))}
+            onChange={value => {
+              setCarId(value);
+              setPaymentType('Individual');
+              setMembershipId('');
+            }}
+          />
         )}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>2. Choose wash service</Text>
+        <StepHeading step="02" title="Choose wash service" />
         {services.length === 0 && !servicesQuery.isLoading ? (
           <InfoMessage text="No active wash services are available right now." />
         ) : (
-          <View style={styles.choiceList}>
-            {services.map(service => (
-              <ChoiceCard
-                key={service._id}
-                selected={serviceId === service._id}
-                title={service.name}
-                subtitle={`${service.durationMinutes} min · ₹${service.price}`}
-                onPress={() => {
-                  setServiceId(service._id);
-                  setStartDate('');
-                  setEndDate('');
-                  setSelectedSlots({});
-                  setPaymentType('Individual');
-                  setMembershipId('');
-                }}
-              />
-            ))}
-          </View>
+          <SelectField
+            label="Wash service"
+            placeholder="Choose a service"
+            icon="droplet"
+            value={serviceId}
+            options={services.map(service => ({
+              value: service._id,
+              label: service.name,
+              description: `${service.durationMinutes} min · ₹${service.price}`,
+            }))}
+            onChange={value => {
+              setServiceId(value);
+              setStartDate('');
+              setEndDate('');
+              setSelectedSlots({});
+              setPaymentType('Individual');
+              setMembershipId('');
+            }}
+          />
         )}
       </View>
 
       <View style={styles.section}>
         <View style={styles.stepHeader}>
-          <Text style={styles.sectionTitle}>3. Select a date range</Text>
+          <StepHeading step="03" title="Select a date range" />
           {slotsQuery.isFetching ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : null}
         </View>
-        <Card>
+        <Card style={styles.calendarCard}>
+          <View style={styles.fieldLabelRow}>
+            <Text style={styles.fieldLabel}>DATE RANGE</Text>
+            <Text style={styles.fieldHint}>Required</Text>
+          </View>
           <View style={styles.monthHeader}>
             <Pressable
+              accessibilityRole="button"
               accessibilityLabel="Previous month"
               onPress={() => changeMonth(-1)}
               style={styles.monthArrow}>
-              <Text style={styles.monthArrowText}>‹</Text>
+              <Feather name="chevron-left" size={20} color={colors.ink} />
             </Pressable>
             <Text style={styles.monthTitle}>{monthLabel(month)}</Text>
             <Pressable
+              accessibilityRole="button"
               accessibilityLabel="Next month"
               onPress={() => changeMonth(1)}
               style={styles.monthArrow}>
-              <Text style={styles.monthArrowText}>›</Text>
+              <Feather name="chevron-right" size={20} color={colors.ink} />
             </Pressable>
           </View>
           <View style={styles.calendarGrid}>
@@ -432,7 +455,7 @@ const CustomerBookingScreen = ({navigation}: Props) => {
             ))}
             {calendarCells.map((day, index) => {
               if (!day) {
-                return <View key={`empty-${index}`} style={styles.dayCell} />;
+                return <View key={`empty-${index}`} style={styles.emptyDayCell} />;
               }
               const date = localDate(
                 new Date(month.getFullYear(), month.getMonth(), day),
@@ -492,11 +515,14 @@ const CustomerBookingScreen = ({navigation}: Props) => {
             Tap a start date, then an end date. Green dots indicate available slots.
           </Text>
           {startDate ? (
-            <Text style={styles.rangeLabel}>
+            <View style={styles.rangeLabel}>
+              <Feather name="calendar" size={15} color={colors.primaryDark} />
+              <Text style={styles.rangeLabelText}>
               {endDate
                 ? `Selected: ${startDate} – ${endDate}`
                 : `Start: ${startDate} · Choose an end date`}
-            </Text>
+              </Text>
+            </View>
           ) : null}
           {startDate || endDate ? (
             <Pressable
@@ -522,9 +548,7 @@ const CustomerBookingScreen = ({navigation}: Props) => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          4. Choose a time for each date
-        </Text>
+        <StepHeading step="04" title="Choose a time for each date" />
         {!startDate ? (
           <InfoMessage text="Select a start and end date in the calendar to view the range schedule." />
         ) : !endDate ? (
@@ -545,12 +569,27 @@ const CustomerBookingScreen = ({navigation}: Props) => {
                 );
               return (
                 <View key={date} style={styles.dateSlotCard}>
-                  <Text style={styles.dateSlotTitle}>
-                    {new Date(`${date}T00:00:00`).toLocaleDateString(
-                      undefined,
-                      {weekday: 'short', month: 'short', day: 'numeric'},
-                    )}
-                  </Text>
+                  <View style={styles.dateSlotHeader}>
+                    <View style={styles.dateSlotLabel}>
+                      <Feather
+                        name="calendar"
+                        size={16}
+                        color={colors.primary}
+                      />
+                      <Text style={styles.dateSlotTitle}>
+                        {new Date(`${date}T00:00:00`).toLocaleDateString(
+                          undefined,
+                          {weekday: 'short', month: 'short', day: 'numeric'},
+                        )}
+                      </Text>
+                    </View>
+                    <View style={styles.slotCountBadge}>
+                      <Text style={styles.slotCountText}>
+                        {availableSlots.length}{' '}
+                        {availableSlots.length === 1 ? 'time' : 'times'}
+                      </Text>
+                    </View>
+                  </View>
                   {availableSlots.length === 0 ? (
                     <Text style={styles.noSlots}>
                       No available slots · this date will be skipped
@@ -564,6 +603,7 @@ const CustomerBookingScreen = ({navigation}: Props) => {
                           <Pressable
                             key={slot._id}
                             accessibilityRole="button"
+                            accessibilityLabel={`${slot.startTime} to ${slot.endTime}`}
                             accessibilityState={{selected}}
                             onPress={() =>
                               setSelectedSlots(current => ({
@@ -571,9 +611,10 @@ const CustomerBookingScreen = ({navigation}: Props) => {
                                 [date]: slot,
                               }))
                             }
-                            style={[
+                            style={({pressed}) => [
                               styles.slot,
                               selected && styles.slotSelected,
+                              pressed && styles.slotPressed,
                             ]}>
                             <Text
                               style={[
@@ -613,24 +654,33 @@ const CustomerBookingScreen = ({navigation}: Props) => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>5. Booking type</Text>
-        <View style={styles.choiceList}>
-          <ChoiceCard
-            selected={paymentType === 'Individual'}
-            title="Pay for each wash"
-            subtitle="Book only the dates you selected."
-            onPress={() => {
+        <StepHeading step="05" title="Booking type" />
+        <SelectField
+          label="Payment type"
+          placeholder="Choose how to book"
+          icon="credit-card"
+          value={paymentType}
+          options={[
+            {
+              value: 'Individual',
+              label: 'Pay for each wash',
+              description: 'Book only the dates you selected.',
+            },
+            {
+              value: 'Membership',
+              label: 'Use a purchased membership',
+              description: 'Reserve one wash for each selected date.',
+            },
+          ]}
+          onChange={value => {
+            if (value === 'Individual') {
               setPaymentType('Individual');
               setMembershipId('');
-            }}
-          />
-          <ChoiceCard
-            selected={paymentType === 'Membership'}
-            title="Use a purchased membership"
-            subtitle="One wash per selected date will be reserved."
-            onPress={() => setPaymentType('Membership')}
-          />
-        </View>
+            } else if (value === 'Membership') {
+              setPaymentType('Membership');
+            }
+          }}
+        />
         {paymentType === 'Membership' ? (
           membershipsQuery.isLoading ? (
             <LoadingMessage text="Loading your memberships..." />
@@ -649,46 +699,89 @@ const CustomerBookingScreen = ({navigation}: Props) => {
           ) : !startDate ? (
             <InfoMessage text="Choose a date range first to check memberships valid for those dates." />
           ) : membershipsForDates.length ? (
-            <View style={styles.choiceList}>
-              {membershipsForDates.map(membership => (
-                <ChoiceCard
-                  key={membership._id}
-                  selected={membershipId === membership._id}
-                  title={`${entityLabel(membership.carId)} · Membership`}
-                  subtitle={`${Math.max(
-                    0,
-                    Number(membership.includedWashes ?? 0) -
-                      Number(membership.usedWashes ?? 0) -
-                      Number(membership.reservedWashes ?? 0),
-                  )} washes available · valid for selected dates`}
-                  onPress={() => setMembershipId(membership._id)}
-                />
-              ))}
-            </View>
+            <SelectField
+              label="Eligible membership"
+              placeholder="Choose a membership"
+              icon="award"
+              value={membershipId}
+              options={membershipsForDates.map(membership => ({
+                value: membership._id,
+                label: `${entityLabel(membership.carId)} · Membership`,
+                description: `${Math.max(
+                  0,
+                  Number(membership.includedWashes ?? 0) -
+                    Number(membership.usedWashes ?? 0) -
+                    Number(membership.reservedWashes ?? 0),
+                )} washes available · valid for selected dates`,
+              }))}
+              onChange={setMembershipId}
+            />
           ) : (
             <InfoMessage text="No active, paid membership with enough remaining washes matches this car and the selected dates." />
           )
         ) : null}
         {paymentType === 'Individual' ? (
           <>
-            <Text style={styles.sectionTitle}>6. Payment method</Text>
-            <View style={styles.choiceList}>
-              <ChoiceCard
-                selected={paymentMethod === 'Stripe'}
-                title="Pay online"
-                subtitle="Complete payment securely after each booking."
-                onPress={() => setPaymentMethod('Stripe')}
-              />
-              <ChoiceCard
-                selected={paymentMethod === 'Cash'}
-                title="Cash to the worker"
-                subtitle="Pay the worker on the selected service date."
-                onPress={() => setPaymentMethod('Cash')}
-              />
-            </View>
+            <StepHeading step="06" title="Payment method" />
+            <SelectField
+              label="How would you like to pay?"
+              placeholder="Choose a payment method"
+              icon="credit-card"
+              value={paymentMethod}
+              options={[
+                {
+                  value: 'Stripe',
+                  label: 'Pay online',
+                  description: 'Complete payment securely after booking.',
+                },
+                {
+                  value: 'Cash',
+                  label: 'Cash to the worker',
+                  description: 'Pay on the selected service date.',
+                },
+              ]}
+              onChange={value => {
+                if (value === 'Stripe' || value === 'Cash') {
+                  setPaymentMethod(value);
+                }
+              }}
+            />
           </>
         ) : null}
       </View>
+
+      {selectedCar && selectedService ? (
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryHeader}>
+            <View style={styles.summaryIcon}>
+              <Feather name="clipboard" size={17} color={colors.primary} />
+            </View>
+            <Text style={styles.summaryTitle}>Your booking</Text>
+          </View>
+          <SummaryRow
+            label="Vehicle"
+            value={`${selectedCar.registrationNumber} · ${selectedCar.make} ${selectedCar.model}`}
+          />
+          <SummaryRow label="Wash" value={selectedService.name} />
+          <SummaryRow
+            label="Selected dates"
+            value={`${chosenBookings.length} wash${chosenBookings.length === 1 ? '' : 'es'} · ${dateRange.length - chosenBookings.length} skipped`}
+          />
+          <SummaryRow
+            label="Payment"
+            value={
+              paymentType === 'Membership'
+                ? selectedMembership
+                  ? 'Purchased membership'
+                  : 'Choose a membership'
+                : paymentMethod === 'Stripe'
+                  ? 'Pay online'
+                  : 'Cash to the worker'
+            }
+            last
+          />
+        </View>
+      ) : null}
 
       {error ? <InfoMessage text={error} variant="error" /> : null}
       {success ? <InfoMessage text={success} variant="success" /> : null}
@@ -711,65 +804,349 @@ const entityLabel = (value: Car['flatId']) =>
     : [value.block, value.flatNumber].filter(Boolean).join(' · ') ||
       'Registered flat';
 
-const ChoiceCard = ({
-  selected,
-  title,
-  subtitle,
-  imageUri,
-  onPress,
+type SelectOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
+
+const SelectField = ({
+  label,
+  placeholder,
+  icon,
+  value,
+  options,
+  onChange,
 }: {
-  selected: boolean;
-  title: string;
-  subtitle: string;
-  imageUri?: string;
-  onPress: () => void;
+  label: string;
+  placeholder: string;
+  icon: string;
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+}) => {
+  const [visible, setVisible] = useState(false);
+  const selectedOption = options.find(option => option.value === value);
+
+  return (
+    <>
+      <View style={styles.selectField}>
+        <Text style={styles.selectLabel}>{label}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${label}: ${selectedOption?.label ?? placeholder}`}
+          accessibilityState={{expanded: visible, disabled: options.length === 0}}
+          disabled={options.length === 0}
+          onPress={() => setVisible(true)}
+          style={({pressed}) => [
+            styles.selectControl,
+            visible && styles.selectControlOpen,
+            pressed && styles.selectControlPressed,
+            options.length === 0 && styles.selectControlDisabled,
+          ]}>
+          <View style={styles.selectIcon}>
+            <Feather name={icon} size={18} color={colors.primary} />
+          </View>
+          <View style={styles.selectCopy}>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.selectValue,
+                !selectedOption && styles.selectPlaceholder,
+              ]}>
+              {selectedOption?.label ?? placeholder}
+            </Text>
+            {selectedOption?.description ? (
+              <Text numberOfLines={1} style={styles.selectDescription}>
+                {selectedOption.description}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.selectArrow}>
+            <Feather
+              name={visible ? 'chevron-up' : 'chevron-down'}
+              size={17}
+              color={colors.muted}
+            />
+          </View>
+        </Pressable>
+      </View>
+
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setVisible(false)}>
+        <View style={styles.selectOverlay}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close options"
+            onPress={() => setVisible(false)}
+            style={styles.selectBackdrop}
+          />
+          <View style={styles.selectSheet}>
+            <View style={styles.selectSheetHeader}>
+              <View style={styles.selectSheetHeading}>
+                <Text style={styles.selectSheetTitle}>{label}</Text>
+                <Text style={styles.selectSheetSubtitle}>
+                  Choose one option
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close options"
+                onPress={() => setVisible(false)}
+                style={styles.selectClose}>
+                <Feather name="x" size={19} color={colors.ink} />
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.selectOptions}
+              contentContainerStyle={styles.selectOptionsContent}
+              showsVerticalScrollIndicator={false}>
+              {options.map(option => {
+                const selected = option.value === value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    accessibilityRole="button"
+                    accessibilityState={{selected}}
+                    onPress={() => {
+                      onChange(option.value);
+                      setVisible(false);
+                    }}
+                    style={[
+                      styles.selectOption,
+                      selected && styles.selectOptionSelected,
+                    ]}>
+                    <View style={styles.selectOptionCopy}>
+                      <Text style={styles.selectOptionTitle}>
+                        {option.label}
+                      </Text>
+                      {option.description ? (
+                        <Text style={styles.selectOptionDescription}>
+                          {option.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Feather
+                      name={selected ? 'check-circle' : 'circle'}
+                      size={20}
+                      color={selected ? colors.primary : '#AAB8C2'}
+                    />
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+};
+
+const StepHeading = ({step, title}: {step: string; title: string}) => (
+  <View style={styles.stepHeading}>
+    <Text style={styles.stepNumber}>{step}</Text>
+    <Text style={styles.sectionTitle}>{title}</Text>
+  </View>
+);
+
+const SummaryRow = ({
+  label,
+  value,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  last?: boolean;
 }) => (
-  <Pressable
-    accessibilityRole="button"
-    accessibilityState={{selected}}
-    onPress={onPress}
-    style={[styles.choice, selected && styles.choiceSelected]}>
-    <View style={[styles.radio, selected && styles.radioSelected]} />
-    {imageUri ? <Image source={{uri: imageUri}} style={styles.carImage} /> : null}
-    <View style={styles.choiceCopy}>
-      <Text style={styles.choiceTitle}>{title}</Text>
-      <Text style={styles.choiceSubtitle}>{subtitle}</Text>
-    </View>
-  </Pressable>
+  <View style={[styles.summaryRow, last && styles.summaryRowLast]}>
+    <Text style={styles.summaryLabel}>{label}</Text>
+    <Text style={styles.summaryValue}>{value}</Text>
+  </View>
 );
 
 const styles = StyleSheet.create({
   section: {gap: 10},
   sectionTitle: {fontSize: 16, fontWeight: '800', color: colors.ink},
-  choiceList: {gap: 8},
-  choice: {
-    minHeight: 66,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 13,
-    backgroundColor: colors.white,
+  stepHeading: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  stepNumber: {
+    width: 30,
+    height: 30,
+    lineHeight: 30,
+    borderRadius: 10,
+    overflow: 'hidden',
+    textAlign: 'center',
+    backgroundColor: colors.paleBlue,
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  bookingIntro: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 11,
+    gap: 14,
+    padding: 18,
+    borderRadius: 20,
+    backgroundColor: colors.primaryDark,
   },
-  choiceSelected: {borderColor: colors.primary, backgroundColor: '#F0FAFA'},
-  radio: {
-    width: 19,
-    height: 19,
+  introIcon: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  introCopy: {flex: 1, gap: 3},
+  introEyebrow: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  introTitle: {color: colors.white, fontSize: 17, fontWeight: '800'},
+  introDescription: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  selectField: {gap: 7},
+  selectLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  selectControl: {
+    minHeight: 66,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderWidth: 1.5,
-    borderColor: '#AAB8C2',
+    borderColor: '#D5E0E7',
+    borderRadius: 15,
+    backgroundColor: colors.white,
+    shadowColor: '#18364A',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  selectControlOpen: {borderColor: colors.primary},
+  selectControlPressed: {opacity: 0.82},
+  selectControlDisabled: {opacity: 0.55},
+  selectIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: colors.paleBlue,
+  },
+  selectCopy: {flex: 1, gap: 3},
+  selectValue: {fontSize: 14, fontWeight: '700', color: colors.ink},
+  selectPlaceholder: {fontWeight: '600', color: colors.muted},
+  selectDescription: {fontSize: 11, color: colors.muted},
+  selectArrow: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 10,
+    backgroundColor: '#F2F6F8',
   },
-  radioSelected: {
-    borderWidth: 6,
+  selectOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(17,35,48,0.42)',
+  },
+  selectBackdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  selectSheet: {
+    maxHeight: '78%',
+    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    backgroundColor: colors.white,
+    elevation: 12,
+  },
+  selectSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  selectSheetHeading: {flex: 1, gap: 4},
+  selectSheetTitle: {fontSize: 19, fontWeight: '800', color: colors.ink},
+  selectSheetSubtitle: {fontSize: 13, color: colors.muted},
+  selectClose: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: colors.canvas,
+  },
+  selectOptions: {marginTop: 12},
+  selectOptionsContent: {gap: 9, paddingBottom: 4},
+  selectOption: {
+    minHeight: 66,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 15,
+    backgroundColor: colors.white,
+  },
+  selectOptionSelected: {
     borderColor: colors.primary,
+    backgroundColor: '#EFF9F8',
   },
-  choiceCopy: {flex: 1, gap: 3},
-  carImage: {width: 64, height: 48, borderRadius: 8, backgroundColor: colors.canvas},
-  choiceTitle: {fontSize: 14, fontWeight: '700', color: colors.ink},
-  choiceSubtitle: {fontSize: 12, color: colors.muted},
-  stepHeader: {flexDirection: 'row', justifyContent: 'space-between'},
+  selectOptionCopy: {flex: 1, gap: 4},
+  selectOptionTitle: {fontSize: 14, fontWeight: '700', color: colors.ink},
+  selectOptionDescription: {fontSize: 12, lineHeight: 17, color: colors.muted},
+  fieldLabelRow: {
+    minHeight: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+    color: colors.muted,
+  },
+  fieldHint: {fontSize: 11, fontWeight: '700', color: colors.primary},
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  calendarCard: {
+    padding: 16,
+    gap: 14,
+    borderColor: '#DDE7ED',
+    borderRadius: 20,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 2,
+  },
   monthHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -780,16 +1157,15 @@ const styles = StyleSheet.create({
     width: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: '#F1F5F7',
+    borderRadius: 12,
+    backgroundColor: colors.canvas,
   },
-  monthArrowText: {fontSize: 26, color: colors.ink, lineHeight: 30},
-  monthTitle: {fontSize: 16, fontWeight: '800', color: colors.ink},
+  monthTitle: {fontSize: 17, fontWeight: '800', color: colors.ink},
   calendarGrid: {flexDirection: 'row', flexWrap: 'wrap'},
   weekday: {
     width: '14.2857%',
-    height: 34,
-    lineHeight: 34,
+    height: 32,
+    lineHeight: 32,
     textAlign: 'center',
     fontWeight: '700',
     color: colors.muted,
@@ -801,10 +1177,24 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 13,
+    backgroundColor: '#F6F8FA',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
-  dayInRange: {backgroundColor: '#D9F0EF'},
-  daySelected: {backgroundColor: colors.primary},
+  emptyDayCell: {width: '14.2857%', height: 42},
+  dayInRange: {
+    backgroundColor: '#D9F0EF',
+    borderColor: '#C4E8E5',
+  },
+  daySelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryDark,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   dayDisabled: {opacity: 0.36},
   dayText: {fontSize: 14, color: colors.ink, fontWeight: '600'},
   dayTextInRange: {color: colors.primary, fontWeight: '700'},
@@ -818,8 +1208,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#18A477',
     bottom: 3,
   },
-  legend: {fontSize: 11, color: colors.muted, textAlign: 'center'},
-  rangeLabel: {fontSize: 12, color: colors.ink, textAlign: 'center'},
+  legend: {
+    paddingTop: 4,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.muted,
+    textAlign: 'center',
+  },
+  rangeLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    padding: 10,
+    borderRadius: 11,
+    backgroundColor: colors.paleBlue,
+  },
+  rangeLabelText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primaryDark,
+    textAlign: 'center',
+  },
   clearRange: {
     fontSize: 12,
     color: colors.primary,
@@ -830,13 +1240,33 @@ const styles = StyleSheet.create({
   dateSlotList: {gap: 10},
   dateSlotCard: {
     gap: 8,
-    padding: 12,
-    borderRadius: 12,
+    padding: 14,
+    borderRadius: 17,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#DFE8ED',
+    shadowColor: '#18364A',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.06,
+    shadowRadius: 7,
+    elevation: 1,
   },
+  dateSlotHeader: {
+    minHeight: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  dateSlotLabel: {flexDirection: 'row', alignItems: 'center', gap: 8},
   dateSlotTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
+  slotCountBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
+  },
+  slotCountText: {fontSize: 10, fontWeight: '800', color: colors.primaryDark},
   noSlots: {fontSize: 12, color: colors.muted},
   selectedSlotLabel: {fontSize: 11, color: colors.primary, fontWeight: '700'},
   rangeSummary: {
@@ -847,22 +1277,76 @@ const styles = StyleSheet.create({
   },
   slotGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
   slot: {
-    width: '31.5%',
-    minHeight: 55,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
+    width: '31%',
+    minHeight: 62,
+    borderWidth: 1.5,
+    borderColor: '#E1E8ED',
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: '#F8FAFB',
     gap: 2,
+    shadowColor: '#18364A',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  slotSelected: {borderColor: colors.primary, backgroundColor: colors.primary},
+  slotSelected: {
+    borderColor: colors.primaryDark,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  slotPressed: {opacity: 0.78},
   slotDisabled: {backgroundColor: '#EEF1F3'},
   slotText: {fontSize: 14, fontWeight: '800', color: colors.ink},
   slotEnd: {fontSize: 10, color: colors.muted},
   slotTextSelected: {color: colors.white},
   slotTextDisabled: {color: '#8797A5'},
+  summaryCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    backgroundColor: colors.white,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 8,
+  },
+  summaryIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+    backgroundColor: colors.paleBlue,
+  },
+  summaryTitle: {fontSize: 15, fontWeight: '800', color: colors.ink},
+  summaryRow: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  summaryRowLast: {borderBottomWidth: 0},
+  summaryLabel: {fontSize: 12, fontWeight: '600', color: colors.muted},
+  summaryValue: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.ink,
+    textAlign: 'right',
+  },
 });
 
 export default CustomerBookingScreen;

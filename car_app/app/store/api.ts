@@ -8,8 +8,35 @@ import {
   requestApiConfirmation,
 } from './request-ui';
 
+const fetchWithTimeout: typeof fetch = async (input, init) => {
+  const requestSignal =
+    init?.signal ?? (input instanceof Request ? input.signal : undefined);
+  const controller = new AbortController();
+  const abortRequest = () => controller.abort(requestSignal?.reason);
+
+  if (requestSignal?.aborted) {
+    abortRequest();
+  } else {
+    requestSignal?.addEventListener('abort', abortRequest, {once: true});
+  }
+
+  const timeoutId = setTimeout(() => {
+    const timeoutError = new Error('Request timed out');
+    timeoutError.name = 'TimeoutError';
+    controller.abort(timeoutError);
+  }, 15_000);
+
+  try {
+    return await fetch(input, {...init, signal: controller.signal});
+  } finally {
+    clearTimeout(timeoutId);
+    requestSignal?.removeEventListener('abort', abortRequest);
+  }
+};
+
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,
+  fetchFn: fetchWithTimeout,
   prepareHeaders: (headers, {getState}) => {
     const token = (getState() as RootState).auth.token;
     if (token) {
@@ -18,8 +45,6 @@ const rawBaseQuery = fetchBaseQuery({
     return headers;
   },
 });
-console.log('API_BASE_URL:-----', API_BASE_URL);
-
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: async (args, apiContext, extraOptions) => {
@@ -52,7 +77,8 @@ export const api = createApi({
       }
     }
 
-    const finishRequest = beginApiRequest();
+    const finishRequest =
+      apiContext.type === 'mutation' ? beginApiRequest() : undefined;
     try {
       const response = await rawBaseQuery(args, apiContext, extraOptions);
       if (response.error?.status === 401) {
@@ -64,7 +90,7 @@ export const api = createApi({
       }
       return response;
     } finally {
-      finishRequest();
+      finishRequest?.();
     }
   },
   tagTypes: [

@@ -82,6 +82,31 @@ describe('customer booking API', () => {
     expect(result.data).toEqual([{_id: 'booking-1', status: 'Pending'}]);
   });
 
+  it('does not block the app while a screen data query is pending', async () => {
+    let resolveFetch: ((response: Response) => void) | undefined;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>(resolve => {
+          resolveFetch = resolve;
+        }),
+    );
+
+    const request = store.dispatch(
+      customerApi.endpoints.getMyBookings.initiate(),
+    );
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    expect(getRequestUiSnapshot().activeRequests).toBe(0);
+    resolveFetch?.(
+      new Response(
+        JSON.stringify({success: true, data: {data: []}}),
+        {status: 200, headers: {'content-type': 'application/json'}},
+      ),
+    );
+    await request.unwrap();
+    request.unsubscribe();
+  });
+
   it('loads the signed-in customer payment history with method filters', async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(
@@ -258,6 +283,37 @@ describe('customer booking API', () => {
     const fetchRequest = fetchMock.mock.calls[0][0] as Request;
     expect(fetchRequest.url).toContain('/api/v1/memberships/mine');
     expect(result.data).toEqual([{_id: 'membership-1', status: 'Active'}]);
+  });
+
+  it('uploads car images through the authenticated server endpoint', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {url: 'https://images.example/car.jpg'},
+        }),
+        {status: 200, headers: {'content-type': 'application/json'}},
+      ),
+    );
+
+    await store
+      .dispatch(
+        customerApi.endpoints.uploadImage.initiate({
+          image: '/9j/4AAQSkZJRg==',
+          mimeType: 'image/jpeg',
+        }),
+      )
+      .unwrap();
+
+    const fetchRequest = fetchMock.mock.calls[0][0] as Request;
+    expect(fetchRequest.url).toContain('/api/v1/uploads/images');
+    expect(fetchRequest.headers.get('authorization')).toBe(
+      'Bearer customer-test-token',
+    );
+    expect(await fetchRequest.clone().json()).toEqual({
+      image: '/9j/4AAQSkZJRg==',
+      mimeType: 'image/jpeg',
+    });
   });
 
   it('starts membership purchase through the customer-only route', async () => {

@@ -3,10 +3,12 @@ import {
   Image,
   PermissionsAndroid,
   Platform,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Feather from 'react-native-vector-icons/Feather';
 import {launchCamera} from 'react-native-image-picker';
 import {
   ActionButton,
@@ -105,16 +107,19 @@ const WorkerAttendanceScreen = () => {
   };
 
   return (
-    <Page>
-      <PageTitle
+    <Page
+      refreshControl={
+        <RefreshControl
+          refreshing={isFetching}
+          onRefresh={() => {
+            refetch();
+          }}
+          tintColor={colors.primary}
+        />
+      }>
+      <PageTitle compact
         title="My attendance"
         subtitle="Take a selfie to record today's punch in and punch out."
-      />
-      <ActionButton
-        title={isFetching ? 'Refreshing...' : 'Refresh attendance'}
-        onPress={() => refetch()}
-        variant="secondary"
-        disabled={isFetching}
       />
       {isLoading ? (
         <LoadingMessage text="Loading today's attendance..." />
@@ -125,39 +130,69 @@ const WorkerAttendanceScreen = () => {
         />
       ) : (
         <>
-          <Card>
-            <Text style={styles.heading}>Today's shift</Text>
-            <Text style={styles.copy}>
-              {new Date().toLocaleDateString('en-IN', {
-                weekday: 'long',
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </Text>
+          <Card style={styles.shiftCard}>
+            <View style={styles.cardHeading}>
+              <View style={styles.cardIcon}>
+                <Feather name="calendar" size={16} color={colors.primary} />
+              </View>
+              <View style={styles.cardHeadingCopy}>
+                <Text style={styles.heading}>Today's shift</Text>
+                <Text style={styles.copy}>
+                  {new Date().toLocaleDateString('en-IN', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </Text>
+              </View>
+            </View>
             <View style={styles.row}>
               <View style={styles.timeCard}>
-                <Text style={styles.label}>Punch in</Text>
+                <View style={styles.timeLabel}>
+                  <Feather name="log-in" size={14} color={colors.primary} />
+                  <Text style={styles.label}>Punch in</Text>
+                </View>
                 <Text style={styles.time}>{formatTime(attendance?.punchInAt)}</Text>
               </View>
               <View style={styles.timeCard}>
-                <Text style={styles.label}>Punch out</Text>
+                <View style={styles.timeLabel}>
+                  <Feather name="log-out" size={14} color={colors.muted} />
+                  <Text style={styles.label}>Punch out</Text>
+                </View>
                 <Text style={styles.time}>{formatTime(attendance?.punchOutAt)}</Text>
               </View>
             </View>
           </Card>
 
-          <Card>
+          <Card style={styles.selfieCard}>
+            <View style={styles.cardHeading}>
+              <View style={styles.cardIcon}>
+                <Feather name="camera" size={16} color={colors.primary} />
+              </View>
+              <View style={styles.cardHeadingCopy}>
+                <Text style={styles.heading}>Attendance selfie</Text>
+                <Text style={styles.copy}>
+                  Take a fresh selfie for each punch.
+                </Text>
+              </View>
+            </View>
             {selfie ? (
               <Image source={{uri: selfie}} style={styles.preview} />
             ) : (
-              <Text style={styles.copy}>
-                A front-camera selfie is required for every punch.
-              </Text>
+              <View style={styles.selfiePlaceholder}>
+                <View style={styles.cameraIcon}>
+                  <Feather name="camera" size={22} color={colors.primary} />
+                </View>
+                <Text style={styles.placeholderTitle}>Selfie required</Text>
+                <Text style={styles.copy}>
+                  Use the front camera to verify your attendance.
+                </Text>
+              </View>
             )}
             <ActionButton
               title={selfie ? 'Retake selfie' : 'Take selfie'}
-              onPress={() => void captureSelfie()}
+              onPress={captureSelfie}
               variant="secondary"
             />
           </Card>
@@ -177,7 +212,7 @@ const WorkerAttendanceScreen = () => {
                     ? 'Punch out'
                     : 'Punch in'
               }
-              onPress={() => void submitPunch()}
+              onPress={submitPunch}
               disabled={mutation.isLoading}
               variant={isPunchedIn ? 'danger' : 'primary'}
             />
@@ -189,19 +224,55 @@ const WorkerAttendanceScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  shiftCard: {gap: 15, borderRadius: 18},
+  selfieCard: {gap: 13, borderRadius: 18},
+  cardHeading: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  cardIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+    backgroundColor: colors.paleBlue,
+  },
+  cardHeadingCopy: {flex: 1, gap: 3},
   heading: {fontSize: 17, fontWeight: '800', color: colors.ink},
   copy: {fontSize: 13, lineHeight: 19, color: colors.muted},
   row: {flexDirection: 'row', gap: 10},
   timeCard: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: 14,
     padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.canvas,
     gap: 6,
   },
-  label: {fontSize: 12, color: colors.muted},
-  time: {fontSize: 16, fontWeight: '700', color: colors.ink},
-  preview: {width: '100%', height: 260, borderRadius: 12},
+  timeLabel: {flexDirection: 'row', alignItems: 'center', gap: 6},
+  label: {fontSize: 11, fontWeight: '600', color: colors.muted},
+  time: {fontSize: 16, fontWeight: '800', color: colors.ink},
+  preview: {width: '100%', height: 220, borderRadius: 14},
+  selfiePlaceholder: {
+    minHeight: 132,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 18,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#C9D9E1',
+    borderRadius: 16,
+    backgroundColor: colors.canvas,
+  },
+  cameraIcon: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: colors.paleBlue,
+  },
+  placeholderTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
 });
 
 export default WorkerAttendanceScreen;

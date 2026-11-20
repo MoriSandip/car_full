@@ -76,6 +76,7 @@ const endpointsWithoutConfirmation = new Set([
   'customerLogin',
   'customerRegister',
   'workerLogin',
+  'uploadImage',
   'requestLoginOtp',
   'verifyLoginOtp',
   'requestPasswordReset',

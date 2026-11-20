@@ -1,5 +1,14 @@
 import React, {useMemo, useState} from 'react';
-import {Linking, Pressable, StyleSheet, Text, View} from 'react-native';
+import {
+  Linking,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Feather from 'react-native-vector-icons/Feather';
 import DateTimePicker, {
   DateType,
   useDefaultStyles,
@@ -42,6 +51,7 @@ const localDate = (date: Date) =>
   ).padStart(2, '0')}`;
 
 const CustomerMembershipsScreen = () => {
+  const [purchaseVisible, setPurchaseVisible] = useState(false);
   const [carId, setCarId] = useState('');
   const [planId, setPlanId] = useState('');
   const [offerId, setOfferId] = useState('');
@@ -86,8 +96,10 @@ const CustomerMembershipsScreen = () => {
         kind: 'membership',
       });
       await Linking.openURL(checkout.data.url);
+      return true;
     } catch (requestError) {
       setError(errorText(requestError));
+      return false;
     }
   };
 
@@ -106,8 +118,10 @@ const CustomerMembershipsScreen = () => {
       }).unwrap();
       if (membership.data.paymentStatus === 'Paid') {
         membershipsQuery.refetch();
+        setPurchaseVisible(false);
       } else {
-        await pay(membership.data);
+        const checkoutOpened = await pay(membership.data);
+        if (checkoutOpened) setPurchaseVisible(false);
       }
       membershipsQuery.refetch();
     } catch (requestError) {
@@ -116,27 +130,91 @@ const CustomerMembershipsScreen = () => {
   };
 
   return (
-    <Page>
-      <PageTitle
+    <Page
+      refreshControl={
+        <RefreshControl
+          refreshing={membershipsQuery.isFetching}
+          onRefresh={() => {
+            membershipsQuery.refetch();
+          }}
+          tintColor={colors.primary}
+        />
+      }
+      headerAction={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Purchase membership"
+          onPress={() => {
+            setError('');
+            setPurchaseVisible(true);
+          }}
+          style={styles.addButton}>
+          <Feather name="plus" size={21} color={colors.white} />
+        </Pressable>
+      }>
+      <PageTitle compact
         title="My memberships"
         subtitle="Choose a plan for your verified car. Payment activates the membership."
       />
+      {!purchaseVisible && error ? <InfoMessage text={error} variant="error" /> : null}
+      <BottomSheet
+        visible={purchaseVisible}
+        setVisible={setPurchaseVisible}>
+        <View style={styles.formSheet}>
+          <View style={styles.formSheetHeader}>
+            <Text style={styles.formSheetTitle}>Purchase a membership</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close form"
+              onPress={() => setPurchaseVisible(false)}
+              style={styles.closeButton}>
+              <Feather name="x" size={19} color={colors.ink} />
+            </Pressable>
+          </View>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.formSheetContent}>
       {error ? <InfoMessage text={error} variant="error" /> : null}
-      <Card>
-        <Text style={styles.sectionTitle}>Purchase a membership</Text>
+      <Card style={styles.purchaseCard}>
+        <View style={styles.purchaseHeading}>
+          <View style={styles.purchaseIcon}>
+            <Feather name="shopping-bag" size={17} color={colors.primary} />
+          </View>
+          <Text style={styles.sectionTitle}>Purchase a membership</Text>
+        </View>
         <Text style={styles.label}>Verified car</Text>
         <View style={styles.choices}>
           {cars.map(car => (
-            <ActionButton
+            <Pressable
               key={car._id}
-              title={labelOf(car)}
-              variant={carId === car._id ? 'primary' : 'secondary'}
+              accessibilityRole="button"
+              accessibilityState={{selected: carId === car._id}}
               onPress={() => {
                 setCarId(car._id);
                 setPlanId('');
                 setOfferId('');
               }}
-            />
+              style={[
+                styles.carOption,
+                carId === car._id && styles.carOptionSelected,
+              ]}>
+              <View style={styles.carOptionIcon}>
+                <Feather
+                  name="truck"
+                  size={16}
+                  color={carId === car._id ? colors.primary : colors.muted}
+                />
+              </View>
+              <View style={styles.carOptionCopy}>
+                <Text style={styles.carOptionTitle}>{labelOf(car)}</Text>
+                <Text style={styles.carOptionHint}>Verified vehicle</Text>
+              </View>
+              <Feather
+                name={carId === car._id ? 'check-circle' : 'circle'}
+                size={19}
+                color={carId === car._id ? colors.primary : '#AAB8C2'}
+              />
+            </Pressable>
           ))}
           {!cars.length ? (
             <Text style={styles.body}>
@@ -166,12 +244,29 @@ const CustomerMembershipsScreen = () => {
             <Text style={styles.label}>Eligible offer (optional)</Text>
             <View style={styles.choices}>
               {offers.map(offer => (
-                <ActionButton
+                <Pressable
                   key={offer._id}
-                  title={`${offer.title} · ${offer.discountValue}${offer.discountType === 'Percentage' ? '%' : ' off'}`}
-                  variant={offerId === offer._id ? 'primary' : 'secondary'}
+                  accessibilityRole="button"
+                  accessibilityState={{selected: offerId === offer._id}}
                   onPress={() => setOfferId(offerId === offer._id ? '' : offer._id)}
-                />
+                  style={[
+                    styles.offerOption,
+                    offerId === offer._id && styles.offerOptionSelected,
+                  ]}>
+                  <Feather
+                    name="tag"
+                    size={14}
+                    color={offerId === offer._id ? colors.primary : colors.muted}
+                  />
+                  <Text
+                    style={[
+                      styles.offerText,
+                      offerId === offer._id && styles.offerTextSelected,
+                    ]}>
+                    {offer.title} · {offer.discountValue}
+                    {offer.discountType === 'Percentage' ? '%' : ' off'}
+                  </Text>
+                </Pressable>
               ))}
             </View>
           </>
@@ -197,6 +292,9 @@ const CustomerMembershipsScreen = () => {
           disabled={!carId || !planId || purchaseState.isLoading || checkoutState.isLoading}
         />
       </Card>
+          </ScrollView>
+        </View>
+      </BottomSheet>
       <BottomSheet
         visible={datePickerVisible}
         setVisible={setDatePickerVisible}>
@@ -217,7 +315,10 @@ const CustomerMembershipsScreen = () => {
         </View>
       </BottomSheet>
 
-      <Text style={styles.sectionTitle}>Membership history</Text>
+      <View style={styles.historyHeading}>
+        <Text style={styles.sectionTitle}>Membership history</Text>
+        <Text style={styles.membershipCount}>{memberships.length}</Text>
+      </View>
       {membershipsQuery.isLoading ? (
         <LoadingMessage text="Loading your memberships..." />
       ) : membershipsQuery.isError ? (
@@ -227,85 +328,24 @@ const CustomerMembershipsScreen = () => {
         />
       ) : memberships.length ? (
         memberships.map(membership => (
-          <Card key={membership._id}>
-            <Text style={styles.cardTitle}>
-              {membership.planNameSnapshot || labelOf(membership.planId)} ·{' '}
-              {labelOf(membership.carId)} · ₹{membership.totalAmount}
-            </Text>
-            <Text style={styles.body}>
-              {new Date(membership.startDate).toLocaleDateString()} –{' '}
-              {new Date(membership.endDate).toLocaleDateString()}
-            </Text>
-            <Text style={styles.body}>
-              {membership.paymentStatus} · {membership.status} ·{' '}
-              {membership.status === 'Active'
-                ? `${membership.daysRemaining ?? 0} validity days remaining`
-                : membership.status === 'Expired'
-                  ? 'Membership expired'
-                  : membership.status === 'Cancelled'
-                    ? 'Membership cancelled'
-                    : `Plan validity: ${membership.planValidityDays ?? 0} days`}
-            </Text>
-            <Text style={styles.body}>
-              Renew by{' '}
-              {new Date(
-                membership.renewalDueDate || membership.endDate,
-              ).toLocaleDateString()}
-              {membership.renewalDueSoon ? ' · Renewal due soon' : ''}
-            </Text>
-            <Text style={styles.body}>
-              Services: {membership.planServicesSnapshot?.join(', ') || 'Plan services'}
-            </Text>
-            <Text style={styles.body}>
-              Washes: {membership.completedWashes ?? membership.usedWashes} completed ·{' '}
-              {membership.reservedWashes} scheduled ·{' '}
-              {membership.remainingWashes ??
-                Math.max(
-                  0,
-                  membership.includedWashes -
-                    membership.usedWashes -
-                    membership.reservedWashes,
-                )}{' '}
-              available of {membership.includedWashes}
-            </Text>
-            {membership.status === 'Pending' &&
-            membership.paymentStatus !== 'Paid' ? (
-              <ActionButton title="Pay now" onPress={() => pay(membership)} />
-            ) : null}
-            <Text style={styles.historyTitle}>Daily wash history</Text>
-            {membership.washHistory?.length ? (
-              membership.washHistory.map(wash => (
-                <View key={wash._id} style={styles.historyRow}>
-                  <Text style={styles.body}>
-                    {new Date(wash.bookingDate).toLocaleDateString()} at{' '}
-                    {wash.bookingTime} · {wash.serviceNameSnapshot}
-                  </Text>
-                  <Text style={styles.body}>
-                    {wash.status} / {wash.workStatus || 'Not started'}
-                    {wash.workCompletedAt
-                      ? ` · Completed ${new Date(
-                          wash.workCompletedAt,
-                        ).toLocaleString()}`
-                      : ''}
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.body}>No daily washes scheduled yet.</Text>
-            )}
-          </Card>
+          <MembershipHistoryCard
+            key={membership._id}
+            membership={membership}
+            onPay={() => pay(membership)}
+            paymentError={error}
+          />
         ))
       ) : (
-        <Card>
-          <Text style={styles.body}>No memberships yet.</Text>
+        <Card style={styles.membershipEmpty}>
+          <View style={styles.emptyIcon}>
+            <Feather name="award" size={20} color={colors.primary} />
+          </View>
+          <Text style={styles.cardTitle}>No memberships yet</Text>
+          <Text style={styles.body}>
+            Tap + to choose a verified car and plan.
+          </Text>
         </Card>
       )}
-      <ActionButton
-        title={membershipsQuery.isFetching ? 'Refreshing...' : 'Refresh memberships'}
-        variant="secondary"
-        onPress={() => membershipsQuery.refetch()}
-        disabled={membershipsQuery.isFetching}
-      />
     </Page>
   );
 };
@@ -319,29 +359,318 @@ const PlanOption = ({
   selected: boolean;
   onPress: () => void;
 }) => (
-  <Card style={selected ? styles.selectedPlan : undefined}>
-    <Text style={styles.cardTitle}>{plan.name} · ₹{plan.price}</Text>
-    <Text style={styles.body}>
-      {plan.includedWashes} washes · {plan.validityDays} days
-    </Text>
-    {plan.description ? <Text style={styles.body}>{plan.description}</Text> : null}
-    <ActionButton
-      title={selected ? 'Selected' : 'Choose plan'}
-      variant={selected ? 'primary' : 'secondary'}
-      onPress={onPress}
+  <Pressable
+    accessibilityRole="button"
+    accessibilityState={{selected}}
+    onPress={onPress}
+    style={[styles.planOption, selected && styles.selectedPlan]}>
+    <View style={styles.planCopy}>
+      <Text style={styles.cardTitle}>{plan.name}</Text>
+      <Text style={styles.body}>
+        {plan.includedWashes} washes · {plan.validityDays} days
+        {plan.description ? ` · ${plan.description}` : ''}
+      </Text>
+    </View>
+    <Text style={styles.planPrice}>₹{plan.price}</Text>
+    <Feather
+      name={selected ? 'check-circle' : 'circle'}
+      size={19}
+      color={selected ? colors.primary : '#AAB8C2'}
     />
-  </Card>
+  </Pressable>
 );
 
+const MembershipHistoryCard = ({
+  membership,
+  onPay,
+  paymentError,
+}: {
+  membership: Membership;
+  onPay: () => Promise<boolean>;
+  paymentError: string;
+}) => {
+  const [detailsVisible, setDetailsVisible] = useState(false);
+  const remainingWashes =
+    membership.remainingWashes ??
+    Math.max(
+      0,
+      membership.includedWashes -
+        membership.usedWashes -
+        membership.reservedWashes,
+    );
+
+  const pay = async () => {
+    if (await onPay()) setDetailsVisible(false);
+  };
+
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`View ${membership.planNameSnapshot || 'membership'} details`}
+        onPress={() => setDetailsVisible(true)}>
+        <Card style={styles.membershipCard}>
+          <View style={styles.membershipCardHeader}>
+            <View style={styles.historyIcon}>
+              <Feather name="award" size={16} color={colors.primary} />
+            </View>
+            <View style={styles.historyCopy}>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {membership.planNameSnapshot || labelOf(membership.planId)}
+              </Text>
+              <Text style={styles.body} numberOfLines={1}>
+                {labelOf(membership.carId)}
+              </Text>
+            </View>
+            <View style={styles.membershipStatus}>
+              <Text style={styles.membershipStatusText}>{membership.status}</Text>
+            </View>
+          </View>
+          <View style={styles.membershipSummary}>
+            <Text style={styles.membershipAmount}>₹{membership.totalAmount}</Text>
+            <Text style={styles.body}>
+              {remainingWashes} washes left ·{' '}
+              {new Date(membership.endDate).toLocaleDateString()}
+            </Text>
+          </View>
+        </Card>
+      </Pressable>
+      <BottomSheet visible={detailsVisible} setVisible={setDetailsVisible}>
+        <View style={styles.formSheet}>
+          <View style={styles.formSheetHeader}>
+            <Text style={styles.formSheetTitle}>Membership details</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close membership details"
+              onPress={() => setDetailsVisible(false)}
+              style={styles.closeButton}>
+              <Feather name="x" size={19} color={colors.ink} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.detailsContent}>
+            <Card style={styles.purchaseCard}>
+              <Text style={styles.cardTitle}>
+                {membership.planNameSnapshot || labelOf(membership.planId)}
+              </Text>
+              <Text style={styles.body}>{labelOf(membership.carId)}</Text>
+              <Text style={styles.membershipAmount}>₹{membership.totalAmount}</Text>
+              <Text style={styles.body}>
+                {new Date(membership.startDate).toLocaleDateString()} –{' '}
+                {new Date(membership.endDate).toLocaleDateString()}
+              </Text>
+              <Text style={styles.body}>
+                {membership.paymentStatus} · {membership.status} ·{' '}
+                {membership.status === 'Active'
+                  ? `${membership.daysRemaining ?? 0} validity days remaining`
+                  : membership.status === 'Expired'
+                    ? 'Membership expired'
+                    : membership.status === 'Cancelled'
+                      ? 'Membership cancelled'
+                      : `Plan validity: ${membership.planValidityDays ?? 0} days`}
+              </Text>
+              <Text style={styles.body}>
+                Renew by{' '}
+                {new Date(
+                  membership.renewalDueDate || membership.endDate,
+                ).toLocaleDateString()}
+                {membership.renewalDueSoon ? ' · Renewal due soon' : ''}
+              </Text>
+              <Text style={styles.body}>
+                Services: {membership.planServicesSnapshot?.join(', ') || 'Plan services'}
+              </Text>
+              <Text style={styles.body}>
+                Washes: {membership.completedWashes ?? membership.usedWashes} completed ·{' '}
+                {membership.reservedWashes} scheduled · {remainingWashes} available of{' '}
+                {membership.includedWashes}
+              </Text>
+              {paymentError ? (
+                <InfoMessage text={paymentError} variant="error" />
+              ) : null}
+              {membership.status === 'Pending' &&
+              membership.paymentStatus !== 'Paid' ? (
+                <ActionButton title="Pay now" onPress={pay} />
+              ) : null}
+            </Card>
+            <Text style={styles.sectionTitle}>Daily wash history</Text>
+            {membership.washHistory?.length ? (
+              membership.washHistory.map(wash => (
+                <Card key={wash._id} style={styles.historyRow}>
+                  <Text style={styles.body}>
+                    {new Date(wash.bookingDate).toLocaleDateString()} at{' '}
+                    {wash.bookingTime} · {wash.serviceNameSnapshot}
+                  </Text>
+                  <Text style={styles.body}>
+                    {wash.status} / {wash.workStatus || 'Not started'}
+                    {wash.workCompletedAt
+                      ? ` · Completed ${new Date(
+                          wash.workCompletedAt,
+                        ).toLocaleString()}`
+                      : ''}
+                  </Text>
+                </Card>
+              ))
+            ) : (
+              <Text style={styles.body}>No daily washes scheduled yet.</Text>
+            )}
+          </ScrollView>
+        </View>
+      </BottomSheet>
+    </>
+  );
+};
+
 const styles = StyleSheet.create({
+  addButton: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: colors.primary,
+  },
+  formSheet: {
+    maxHeight: '90%',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backgroundColor: colors.white,
+    paddingTop: 8,
+  },
+  formSheetHeader: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+  },
+  formSheetTitle: {fontSize: 17, fontWeight: '800', color: colors.ink},
+  closeButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: colors.canvas,
+  },
+  formSheetContent: {gap: 12, padding: 16, paddingBottom: 28},
+  detailsContent: {gap: 12, padding: 16, paddingBottom: 28},
+  purchaseCard: {borderRadius: 16},
+  purchaseHeading: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  purchaseIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+    backgroundColor: colors.paleBlue,
+  },
   sectionTitle: {fontSize: 17, fontWeight: '800', color: colors.ink},
   label: {fontSize: 13, fontWeight: '700', color: colors.ink},
-  choices: {gap: 8},
+  choices: {gap: 9},
+  carOption: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 11,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+  },
+  carOptionSelected: {
+    borderColor: colors.primary,
+    backgroundColor: '#EFF9F8',
+  },
+  carOptionIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+    backgroundColor: colors.paleBlue,
+  },
+  carOptionCopy: {flex: 1, gap: 3},
+  carOptionTitle: {fontSize: 13, fontWeight: '700', color: colors.ink},
+  carOptionHint: {fontSize: 11, color: colors.muted},
+  offerOption: {
+    minHeight: 39,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 7,
+    paddingHorizontal: 11,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+  },
+  offerOptionSelected: {borderColor: colors.primary, backgroundColor: colors.paleBlue},
+  offerText: {fontSize: 12, fontWeight: '600', color: colors.muted},
+  offerTextSelected: {color: colors.primaryDark},
   cardTitle: {fontSize: 15, fontWeight: '700', color: colors.ink},
   body: {fontSize: 13, lineHeight: 19, color: colors.muted},
-  historyTitle: {fontSize: 14, fontWeight: '700', color: colors.ink, marginTop: 8},
-  historyRow: {borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8, gap: 2},
-  selectedPlan: {borderColor: colors.primary, borderWidth: 2},
+  membershipCard: {gap: 8, borderRadius: 15, paddingVertical: 13},
+  membershipCardHeader: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  membershipSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  historyHeading: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  membershipCount: {
+    minWidth: 22,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.primaryDark,
+    backgroundColor: colors.paleBlue,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  historyIcon: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: colors.paleBlue,
+  },
+  historyCopy: {flex: 1, gap: 3},
+  membershipStatus: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: '#E8F5EE',
+  },
+  membershipStatusText: {fontSize: 10, fontWeight: '800', color: colors.success},
+  membershipAmount: {fontSize: 20, fontWeight: '900', color: colors.ink},
+  membershipEmpty: {alignItems: 'flex-start', gap: 10, borderRadius: 18},
+  emptyIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: colors.paleBlue,
+  },
+  historyRow: {gap: 3, paddingVertical: 12},
+  planOption: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+  },
+  selectedPlan: {borderColor: colors.primary, backgroundColor: '#EFF9F8'},
+  planCopy: {flex: 1, gap: 3},
+  planPrice: {fontSize: 13, fontWeight: '800', color: colors.ink},
   datePicker: {backgroundColor: colors.white, padding: 18, borderRadius: 16, gap: 12},
 });
 

@@ -6,6 +6,7 @@ import {
   PermissionsAndroid,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import dayjs, {type Dayjs} from 'dayjs';
 import {launchCamera} from 'react-native-image-picker';
+import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
   Card,
@@ -210,36 +212,49 @@ const WorkerJobsScreen = () => {
   };
 
   return (
-    <Page>
-      <PageTitle
+    <Page
+      refreshControl={
+        <RefreshControl
+          refreshing={isFetching}
+          onRefresh={() => {
+            refetch();
+          }}
+          tintColor={colors.primary}
+        />
+      }>
+      <PageTitle compact
         title="Monthly schedule"
-        subtitle="View your assigned washes by date and update job progress."
+        subtitle="Assigned washes by date"
       />
       <View style={styles.monthNavigation}>
-        <ActionButton
-          title="Previous"
-          variant="secondary"
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Previous month"
           onPress={() => {
             const previous = month.subtract(1, 'month');
             setMonth(previous);
             setSelectedDay(previous);
           }}
-        />
+          style={styles.monthArrow}>
+          <Feather name="chevron-left" size={19} color={colors.ink} />
+        </Pressable>
         <Text style={styles.monthLabel}>{month.format('MMMM YYYY')}</Text>
-        <ActionButton
-          title="Next"
-          variant="secondary"
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Next month"
           onPress={() => {
             const next = month.add(1, 'month');
             setMonth(next);
             setSelectedDay(next);
           }}
-        />
+          style={styles.monthArrow}>
+          <Feather name="chevron-right" size={19} color={colors.ink} />
+        </Pressable>
       </View>
       <View style={styles.stats}>
         <ScheduleStat title="Assigned" value={isLoading ? '—' : jobs.length} />
         <ScheduleStat title="Pending" value={isLoading ? '—' : pendingCount} />
-        <ScheduleStat title="Completed" value={isLoading ? '—' : completedCount} />
+        <ScheduleStat title="Done" value={isLoading ? '—' : completedCount} />
         <ScheduleStat title="Cancelled" value={isLoading ? '—' : cancelledCount} />
       </View>
       <ScrollView
@@ -275,12 +290,6 @@ const WorkerJobsScreen = () => {
           );
         })}
       </ScrollView>
-      <ActionButton
-        title={isFetching ? 'Refreshing...' : 'Refresh jobs'}
-        variant="secondary"
-        onPress={() => refetch()}
-        disabled={isFetching}
-      />
       {attendanceQuery.isError ? (
         <InfoMessage
           text="Could not verify today's attendance. Refresh attendance before updating job progress."
@@ -297,6 +306,10 @@ const WorkerJobsScreen = () => {
         value={search}
         onChangeText={setSearch}
       />
+      <View style={styles.filterHeading}>
+        <Feather name="filter" size={15} color={colors.muted} />
+        <Text style={styles.filterHeadingText}>Filter assignments</Text>
+      </View>
       <View style={styles.filters}>
         {['All', 'Pending', 'Confirmed', 'InProgress', 'Completed', 'Cancelled'].map(value => (
           <Pressable
@@ -322,7 +335,10 @@ const WorkerJobsScreen = () => {
           variant="error"
         />
       ) : visibleJobs.length === 0 ? (
-        <Card style={styles.jobCard}>
+        <Card style={styles.emptyCard}>
+          <View style={styles.emptyIcon}>
+            <Feather name="search" size={19} color={colors.primary} />
+          </View>
           <Text style={styles.title}>
             {jobs.length === 0 ? 'No jobs this month' : 'No matching jobs'}
           </Text>
@@ -334,7 +350,10 @@ const WorkerJobsScreen = () => {
         </Card>
       ) : (
         selectedDayJobs.length === 0 ? (
-          <Card style={styles.jobCard}>
+          <Card style={styles.emptyCard}>
+            <View style={styles.emptyIcon}>
+              <Feather name="calendar" size={19} color={colors.primary} />
+            </View>
             <Text style={styles.title}>No jobs for this day</Text>
             <Text style={styles.copy}>
               No matching jobs are scheduled for {selectedDay.format('D MMMM YYYY')}.
@@ -364,6 +383,7 @@ const WorkerJobsScreen = () => {
                   progressDisabled={
                     progressMutation.isLoading || !canUpdateWork
                   }
+                  actionError={actionError}
                 />
               ))}
             </View>
@@ -374,11 +394,17 @@ const WorkerJobsScreen = () => {
   );
 };
 
-const ScheduleStat = ({title, value}: {title: string; value: number | string}) => (
-  <Card style={styles.stat}>
+const ScheduleStat = ({
+  title,
+  value,
+}: {
+  title: string;
+  value: number | string;
+}) => (
+  <View style={styles.stat}>
     <Text style={styles.statNumber}>{value}</Text>
     <Text style={styles.statLabel}>{title}</Text>
-  </Card>
+  </View>
 );
 
 const JobCard = ({
@@ -388,6 +414,7 @@ const JobCard = ({
   onAction,
   onProgress,
   progressDisabled,
+  actionError,
 }: {
   job: Booking;
   disabled: boolean;
@@ -400,6 +427,7 @@ const JobCard = ({
     workerNotes?: string;
   }) => void;
   progressDisabled: boolean;
+  actionError: string;
 }) => {
   const [notes, setNotes] = useState(job.workerNotes || '');
   const [photoError, setPhotoError] = useState('');
@@ -533,9 +561,6 @@ const JobCard = ({
 
   return (
     <Card>
-      {typeof job.carId !== 'string' && job.carId.imageUrl ? (
-        <Image source={{uri: job.carId.imageUrl}} style={styles.carImage} />
-      ) : null}
       <View style={styles.row}>
         <Text style={styles.title}>
           {job.serviceNameSnapshot || 'Car wash'}
@@ -547,32 +572,14 @@ const JobCard = ({
       <Text style={styles.copy}>
         {new Date(job.bookingDate).toLocaleDateString()} · {job.bookingTime}
       </Text>
-      {job.paymentType === 'Membership' ? (
-        <Text style={styles.copy}>
-          Membership wash
-          {typeof job.membershipId === 'object' && job.membershipId
-            ? ` · ${Math.max(
-                0,
-                Number(job.membershipId.includedWashes ?? 0) -
-                  Number(job.membershipId.usedWashes ?? 0) -
-                  Number(job.membershipId.reservedWashes ?? 0),
-              )} more available to schedule`
-            : ''}
-        </Text>
-      ) : null}
-      {job.remarks ? <Text style={styles.copy}>Note: {job.remarks}</Text> : null}
-      {job.paymentMethod === 'Cash' ? (
-        <Text style={styles.copy}>
-          Cash payment · {job.paymentStatus}
-        </Text>
-      ) : null}
       <Text style={styles.workStatus}>Work: {workStatus}</Text>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{expanded: timelineExpanded}}
         onPress={() => setTimelineExpanded(value => !value)}
-        style={styles.timelineToggle}>
-        <Text style={styles.timelineToggleText}>View full task details</Text>
+        style={styles.manageButton}>
+        <Text style={styles.timelineToggleText}>Manage job</Text>
+        <Feather name="chevron-right" size={17} color={colors.primary} />
       </Pressable>
       <Modal
         visible={timelineExpanded}
@@ -582,8 +589,11 @@ const JobCard = ({
         <View style={styles.modalOverlay}>
           <Card style={styles.detailsModal}>
             <ScrollView contentContainerStyle={styles.detailsModalContent}>
-              <Text style={styles.modalTitle}>Task details & work timeline</Text>
+              <Text style={styles.modalTitle}>Job details & progress</Text>
               <Text style={styles.copy}>Times shown in India time</Text>
+              {actionError ? (
+                <InfoMessage text={actionError} variant="error" />
+              ) : null}
               <View style={styles.timeline}>
           <View style={styles.detailsSection}>
             <Text style={styles.sectionTitle}>Booking details</Text>
@@ -736,9 +746,125 @@ const JobCard = ({
               }
             />
           </View>
+          {!isFinal && job.status === 'Confirmed' && workStatus === 'NotStarted' ? (
+            <>
+              {!job.beforePhoto ? (
+                <ActionButton
+                  title="Take before-cleaning photo"
+                  onPress={() => capturePhoto('beforePhoto')}
+                  disabled={progressDisabled || !isBookingDateToday}
+                  variant="secondary"
+                />
+              ) : null}
+              <ActionButton
+                title="Start work"
+                onPress={() => onAction('start')}
+                disabled={disabled || !startAllowed || !job.beforePhoto}
+              />
+            </>
+          ) : workStatus === 'Working' ? (
+            <View style={styles.actions}>
+              <ActionButton
+                title="Pause"
+                onPress={() => onAction('stop')}
+                disabled={disabled || !otherActionsAllowed}
+                variant="secondary"
+                style={styles.action}
+              />
+              <ActionButton
+                title="Complete"
+                onPress={completeWork}
+                disabled={disabled || !otherActionsAllowed || !canComplete}
+                style={[styles.action, styles.actionNext]}
+              />
+            </View>
+          ) : !isFinal && workStatus === 'Paused' ? (
+            <View style={styles.actions}>
+              <ActionButton
+                title="Resume"
+                onPress={() => onAction('resume')}
+                disabled={disabled || !otherActionsAllowed}
+                style={styles.action}
+              />
+              <ActionButton
+                title="Complete"
+                onPress={completeWork}
+                disabled={disabled || !otherActionsAllowed || !canComplete}
+                variant="secondary"
+                style={[styles.action, styles.actionNext]}
+              />
+            </View>
+          ) : null}
+          {!isFinal && workStatus !== 'NotStarted' && workStatus !== 'Completed' ? (
+            <View style={styles.progressSection}>
+              <Text style={styles.workStatus}>Cleaning checklist</Text>
+              {checklistItems.map(([key, title]) => (
+                <Pressable
+                  key={key}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{checked: checklist[key], disabled: progressDisabled}}
+                  disabled={progressDisabled || !isBookingDateToday}
+                  onPress={() =>
+                    onProgress({
+                      cleaningChecklist: {
+                        ...checklist,
+                        [key]: !checklist[key],
+                      },
+                    })
+                  }
+                  style={styles.checklistRow}>
+                  <Text style={styles.checklistMark}>
+                    {checklist[key] ? '✓' : '○'}
+                  </Text>
+                  <Text style={styles.copy}>{title}</Text>
+                </Pressable>
+              ))}
+              {job.afterPhoto ? (
+                <Image source={{uri: job.afterPhoto}} style={styles.photo} />
+              ) : null}
+              <ActionButton
+                title="Take after-cleaning photo"
+                variant="secondary"
+                onPress={() => capturePhoto('afterPhoto')}
+                disabled={progressDisabled || !isBookingDateToday}
+              />
+              <TextField
+                accessibilityLabel="Cleaning notes"
+                placeholder="Cleaning notes (optional)"
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                maxLength={1000}
+              />
+              <ActionButton
+                title="Save notes"
+                variant="secondary"
+                onPress={() => onProgress({workerNotes: notes})}
+                disabled={progressDisabled || !isBookingDateToday}
+              />
+            </View>
+          ) : null}
+          {photoError ? <InfoMessage text={photoError} variant="error" /> : null}
+          {!isFinal && workStatus !== 'NotStarted' && !canComplete ? (
+            <Text style={styles.copy}>
+              Add the after photo and complete every checklist item to finish.
+            </Text>
+          ) : null}
+          {!isFinal &&
+          ((workStatus === 'NotStarted' && !startAllowed) ||
+            (workStatus !== 'NotStarted' &&
+              workStatus !== 'Completed' &&
+              !otherActionsAllowed)) ? (
+            <Text style={styles.copy}>
+              {isBookingDateToday
+                ? 'Start is available at the scheduled booking time.'
+                : 'Work actions are only available on the booking date.'}
+            </Text>
+          ) : null}
+          {isFinal ? <Text style={styles.copy}>This job is closed.</Text> : null}
               </View>
               <ActionButton
-                title="Close details"
+                title="Close"
                 variant="secondary"
                 onPress={() => setTimelineExpanded(false)}
               />
@@ -747,122 +873,6 @@ const JobCard = ({
         </View>
       </Modal>
 
-      {!isFinal && job.status === 'Confirmed' && workStatus === 'NotStarted' ? (
-        <>
-          {!job.beforePhoto ? (
-            <ActionButton
-              title="Take before-cleaning photo"
-              onPress={() => capturePhoto('beforePhoto')}
-              disabled={progressDisabled || !isBookingDateToday}
-              variant="secondary"
-            />
-          ) : null}
-          <ActionButton
-            title="Start work"
-            onPress={() => onAction('start')}
-            disabled={disabled || !startAllowed || !job.beforePhoto}
-          />
-        </>
-      ) : workStatus === 'Working' ? (
-        <View style={styles.actions}>
-          <ActionButton
-            title="Pause"
-            onPress={() => onAction('stop')}
-            disabled={disabled || !otherActionsAllowed}
-            variant="secondary"
-            style={styles.action}
-          />
-          <ActionButton
-            title="Complete"
-            onPress={completeWork}
-            disabled={disabled || !otherActionsAllowed || !canComplete}
-            style={[styles.action, styles.actionNext]}
-          />
-        </View>
-      ) : !isFinal && workStatus === 'Paused' ? (
-        <View style={styles.actions}>
-          <ActionButton
-            title="Resume"
-            onPress={() => onAction('resume')}
-            disabled={disabled || !otherActionsAllowed}
-            style={styles.action}
-          />
-          <ActionButton
-            title="Complete"
-            onPress={completeWork}
-            disabled={disabled || !otherActionsAllowed || !canComplete}
-            variant="secondary"
-            style={[styles.action, styles.actionNext]}
-          />
-        </View>
-      ) : null}
-      {!isFinal && workStatus !== 'NotStarted' && workStatus !== 'Completed' ? (
-        <View style={styles.progressSection}>
-          <Text style={styles.workStatus}>Cleaning checklist</Text>
-          {checklistItems.map(([key, title]) => (
-            <Pressable
-              key={key}
-              accessibilityRole="checkbox"
-              accessibilityState={{checked: checklist[key], disabled: progressDisabled}}
-              disabled={progressDisabled || !isBookingDateToday}
-              onPress={() =>
-                onProgress({
-                  cleaningChecklist: {
-                    ...checklist,
-                    [key]: !checklist[key],
-                  },
-                })
-              }
-              style={styles.checklistRow}>
-              <Text style={styles.checklistMark}>
-                {checklist[key] ? '✓' : '○'}
-              </Text>
-              <Text style={styles.copy}>{title}</Text>
-            </Pressable>
-          ))}
-          {job.afterPhoto ? (
-            <Image source={{uri: job.afterPhoto}} style={styles.photo} />
-          ) : null}
-          <ActionButton
-            title="Take after-cleaning photo"
-            variant="secondary"
-            onPress={() => capturePhoto('afterPhoto')}
-            disabled={progressDisabled || !isBookingDateToday}
-          />
-          <TextField
-            accessibilityLabel="Cleaning notes"
-            placeholder="Cleaning notes (optional)"
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            maxLength={1000}
-          />
-          <ActionButton
-            title="Save notes"
-            variant="secondary"
-            onPress={() => onProgress({workerNotes: notes})}
-            disabled={progressDisabled || !isBookingDateToday}
-          />
-        </View>
-      ) : null}
-      {photoError ? <InfoMessage text={photoError} variant="error" /> : null}
-      {!isFinal && workStatus !== 'NotStarted' && !canComplete ? (
-        <Text style={styles.copy}>
-          Add the after photo and complete every checklist item to finish.
-        </Text>
-      ) : null}
-      {!isFinal &&
-      ((workStatus === 'NotStarted' && !startAllowed) ||
-        (workStatus !== 'NotStarted' &&
-          workStatus !== 'Completed' &&
-          !otherActionsAllowed)) ? (
-        <Text style={styles.copy}>
-          {isBookingDateToday
-            ? 'Start is available at the scheduled booking time.'
-            : 'Work actions are only available on the booking date.'}
-        </Text>
-      ) : null}
-      {isFinal ? <Text style={styles.copy}>This job is closed.</Text> : null}
     </Card>
   );
 };
@@ -892,10 +902,22 @@ const styles = StyleSheet.create({
   copy: {fontSize: 13, lineHeight: 19, color: colors.muted},
   workStatus: {fontSize: 13, color: colors.ink, fontWeight: '700'},
   progressSection: {gap: 8},
-  timelineToggle: {alignSelf: 'flex-start', paddingVertical: 5},
+  manageButton: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 8,
+  },
   timelineToggleText: {fontSize: 13, fontWeight: '700', color: colors.primary},
-  modalOverlay: {flex: 1, justifyContent: 'center', padding: 14, backgroundColor: 'rgba(0,0,0,0.45)'},
-  detailsModal: {maxHeight: '92%'},
+  modalOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)'},
+  detailsModal: {
+    maxHeight: '92%',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
   detailsModalContent: {gap: 10, paddingBottom: 8},
   modalTitle: {fontSize: 18, fontWeight: '800', color: colors.ink},
   timeline: {gap: 10, borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 12},
@@ -926,20 +948,39 @@ const styles = StyleSheet.create({
   checklistRow: {flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36},
   checklistMark: {fontSize: 19, color: colors.primary, fontWeight: '800'},
   photo: {width: '100%', height: 190, borderRadius: 10, backgroundColor: colors.canvas},
-  carImage: {width: '100%', height: 150, borderRadius: 10, backgroundColor: colors.canvas, marginBottom: 8},
   actions: {flexDirection: 'row'},
   action: {flex: 1},
   actionNext: {marginLeft: 8},
-  jobCard: {marginBottom: 12},
   filters: {flexDirection: 'row', flexWrap: 'wrap'},
-  monthNavigation: {flexDirection: 'row', alignItems: 'center'},
-  monthLabel: {flex: 1, marginHorizontal: 8, textAlign: 'center', color: colors.ink, fontSize: 15, fontWeight: '700'},
-  stats: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  stat: {width: '48%', alignItems: 'center', paddingVertical: 10},
-  statNumber: {fontSize: 20, fontWeight: '800', color: colors.primary},
-  statLabel: {fontSize: 12, color: colors.muted},
-  days: {gap: 8, paddingBottom: 4},
-  day: {width: 64, minHeight: 72, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 5, backgroundColor: colors.white},
+  monthNavigation: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  monthArrow: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 13,
+    backgroundColor: colors.white,
+  },
+  monthLabel: {flex: 1, textAlign: 'center', color: colors.ink, fontSize: 16, fontWeight: '800'},
+  stats: {flexDirection: 'row', gap: 8},
+  stat: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statNumber: {fontSize: 16, fontWeight: '900', color: colors.ink},
+  statLabel: {fontSize: 10, fontWeight: '600', color: colors.muted},
+  days: {gap: 8, paddingVertical: 3},
+  day: {width: 64, minHeight: 76, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 5, backgroundColor: colors.white},
   daySelected: {backgroundColor: colors.primary, borderColor: colors.primary},
   dayName: {fontSize: 10, fontWeight: '600', color: colors.muted},
   dayNumber: {fontSize: 15, color: colors.ink},
@@ -948,10 +989,14 @@ const styles = StyleSheet.create({
   dayGroup: {paddingBottom: 4},
   dayHeading: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6, marginBottom: 10},
   dayTitle: {fontSize: 15, fontWeight: '800', color: colors.ink},
+  filterHeading: {flexDirection: 'row', alignItems: 'center', gap: 7},
+  filterHeadingText: {fontSize: 12, fontWeight: '700', color: colors.muted},
   filter: {marginRight: 7, marginBottom: 7, borderRadius: 18, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.white},
   filterSelected: {backgroundColor: colors.paleBlue, borderColor: colors.primary},
   filterText: {fontSize: 12, color: colors.muted, fontWeight: '600'},
   filterTextSelected: {color: colors.primaryDark},
+  emptyCard: {alignItems: 'flex-start', gap: 10, borderRadius: 18},
+  emptyIcon: {width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.paleBlue},
 });
 
 export default WorkerJobsScreen;
