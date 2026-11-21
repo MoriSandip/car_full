@@ -57,6 +57,39 @@ const formatDateTime = (value?: string) => {
       });
 };
 
+const transactionStatusLabel = (status: string) =>
+  status === 'Paid' ? 'Received' : status;
+
+const transactionStatusIcon = (status: string) => {
+  switch (status) {
+    case 'Paid':
+      return 'check-circle';
+    case 'Pending':
+      return 'clock';
+    case 'Failed':
+      return 'x-circle';
+    case 'Refunded':
+      return 'corner-up-left';
+    default:
+      return 'help-circle';
+  }
+};
+
+const transactionStatusColor = (status: string) => {
+  switch (status) {
+    case 'Paid':
+      return colors.success;
+    case 'Pending':
+      return '#A15C00';
+    case 'Failed':
+      return colors.danger;
+    case 'Refunded':
+      return '#6941C6';
+    default:
+      return colors.muted;
+  }
+};
+
 const WorkerCashTransactionsScreen = () => {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<StatusFilter>('');
@@ -231,7 +264,7 @@ const WorkerCashTransactionsScreen = () => {
           <Text style={styles.copy}>
             {search.trim() || status
               ? 'Try another search or transaction status filter.'
-              : 'Cash payments you report while completing a job will appear here.'}
+              : 'Cash collections recorded for your assigned bookings will appear here.'}
           </Text>
         </Card>
       )}
@@ -243,47 +276,86 @@ const WorkerCashTransactionsScreen = () => {
       >
         {selectedTransaction ? (
           <>
-            <View style={styles.detailAmount}>
-              <Text style={styles.detailAmountLabel}>Amount</Text>
-              <Text style={styles.detailAmountValue}>
+            <Card style={styles.detailHero}>
+              <View style={styles.detailHeroHeader}>
+                <View style={styles.detailHeroIcon}>
+                  <Feather
+                    name="dollar-sign"
+                    size={21}
+                    color={colors.primary}
+                  />
+                </View>
+                <TransactionStatusPill
+                  status={selectedTransaction.status}
+                />
+              </View>
+              <Text style={styles.detailHeroAmount}>
                 {formatMoney(selectedTransaction.amount)}
               </Text>
-            </View>
-            <TransactionDetail
-              title="Payment status"
-              value={selectedTransaction.status}
-            />
-            <TransactionDetail
-              title="Recorded on"
-              value={formatDateTime(selectedTransaction.createdAt)}
-            />
-            <TransactionDetail
-              title="Verified on"
-              value={formatDateTime(selectedTransaction.verifiedAt)}
-            />
-            <TransactionDetail
-              title="Reference"
-              value={selectedTransaction.reference}
-            />
+              <Text style={styles.detailHeroTitle} numberOfLines={2}>
+                {selectedTransaction.bookingId?.serviceNameSnapshot ||
+                  'Cash payment'}
+              </Text>
+              <Text style={styles.detailHeroCopy}>
+                Cash collection ·{' '}
+                {formatDateTime(selectedTransaction.createdAt)}
+              </Text>
+            </Card>
+            <Card style={styles.detailCard}>
+              <DetailCardHeading icon="credit-card" title="Payment details" />
+              <TransactionDetail
+                title="Recorded on"
+                value={formatDateTime(selectedTransaction.createdAt)}
+              />
+              {selectedTransaction.verifiedAt ? (
+                <TransactionDetail
+                  title="Verified on"
+                  value={formatDateTime(selectedTransaction.verifiedAt)}
+                />
+              ) : null}
+              {selectedTransaction.reference ? (
+                <TransactionDetail
+                  title="Reference"
+                  value={selectedTransaction.reference}
+                />
+              ) : null}
+              {selectedTransaction.recordedByWorker?.name ||
+              selectedTransaction.recordedBy?.name ? (
+                <TransactionDetail
+                  title="Recorded by"
+                  value={
+                    selectedTransaction.recordedByWorker?.name ||
+                    selectedTransaction.recordedBy?.name
+                  }
+                />
+              ) : null}
+            </Card>
             {selectedTransaction.status === 'Refunded' ? (
-              <>
-                <TransactionDetail
-                  title="Refunded on"
-                  value={formatDateTime(selectedTransaction.refundedAt)}
-                />
-                <TransactionDetail
-                  title="Refund reference"
-                  value={selectedTransaction.refundReference}
-                />
-                <TransactionDetail
-                  title="Refund reason"
-                  value={selectedTransaction.refundReason}
-                />
-              </>
+              <Card style={styles.detailCard}>
+                <DetailCardHeading icon="rotate-ccw" title="Refund details" />
+                {selectedTransaction.refundedAt ? (
+                  <TransactionDetail
+                    title="Refunded on"
+                    value={formatDateTime(selectedTransaction.refundedAt)}
+                  />
+                ) : null}
+                {selectedTransaction.refundReference ? (
+                  <TransactionDetail
+                    title="Refund reference"
+                    value={selectedTransaction.refundReference}
+                  />
+                ) : null}
+                {selectedTransaction.refundReason ? (
+                  <TransactionDetail
+                    title="Refund reason"
+                    value={selectedTransaction.refundReason}
+                  />
+                ) : null}
+              </Card>
             ) : null}
             {selectedTransaction.bookingId ? (
-              <>
-                <Text style={styles.sectionTitle}>Booking</Text>
+              <Card style={styles.detailCard}>
+                <DetailCardHeading icon="calendar" title="Booking details" />
                 <TransactionDetail
                   title="Service"
                   value={
@@ -304,7 +376,11 @@ const WorkerCashTransactionsScreen = () => {
                   }
                 />
                 <TransactionDetail
-                  title="Scheduled"
+                  title="Booking status"
+                  value={selectedTransaction.bookingId.status}
+                />
+                <TransactionDetail
+                  title="Scheduled for"
                   value={`${formatDate(
                     selectedTransaction.bookingId.bookingDate,
                   )} · ${selectedTransaction.bookingId.bookingTime}`}
@@ -320,11 +396,7 @@ const WorkerCashTransactionsScreen = () => {
                     selectedTransaction.customerId?.email
                   }
                 />
-                <TransactionDetail
-                  title="Booking status"
-                  value={selectedTransaction.bookingId.status}
-                />
-              </>
+              </Card>
             ) : null}
           </>
         ) : null}
@@ -349,55 +421,114 @@ const CashTransactionRow = ({
     .join(' ');
   const title = transaction.bookingId?.serviceNameSnapshot || 'Cash payment';
   return (
-    <ListItemPressable
-      accessibilityLabel={`View ${formatMoney(
-        transaction.amount,
-      )} cash transaction details`}
-      onPress={onPress}
-    >
-      <Card style={styles.transactionCard}>
+    <Card style={styles.transactionCard}>
+      <ListItemPressable
+        accessibilityLabel={`View ${formatMoney(
+          transaction.amount,
+        )} cash transaction details`}
+        onPress={onPress}
+        style={styles.transactionDetailsTap}
+      >
         <View style={styles.transactionHeader}>
           <View style={styles.amountGroup}>
             <View style={styles.cashIcon}>
-              <Feather name="dollar-sign" size={16} color={colors.primary} />
+              <Feather name="dollar-sign" size={19} color={colors.primary} />
             </View>
-            <Text style={styles.amount} numberOfLines={1}>
-              {formatMoney(transaction.amount)}
-            </Text>
+            <View style={styles.amountCopy}>
+              <Text style={styles.amountLabel}>TRANSACTION AMOUNT</Text>
+              <Text style={styles.amount} numberOfLines={1}>
+                {formatMoney(transaction.amount)}
+              </Text>
+            </View>
           </View>
-          <Text
-            style={[
-              styles.status,
-              transaction.status === 'Paid' && styles.statusPaid,
-              transaction.status === 'Pending' && styles.statusPending,
-              transaction.status === 'Failed' && styles.statusFailed,
-              transaction.status === 'Refunded' && styles.statusRefunded,
-            ]}
-            numberOfLines={1}
-          >
-            {transaction.status}
-          </Text>
+          <TransactionStatusPill status={transaction.status} />
         </View>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={styles.transactionTitle} numberOfLines={2}>
           {title}
         </Text>
-        <Text style={styles.copy} numberOfLines={1}>
-          {transaction.customerId?.name || 'Customer'} ·{' '}
-          {formatDateTime(transaction.createdAt)}
-        </Text>
+        <View style={styles.transactionMetaRow}>
+          <TransactionMeta
+            icon="user"
+            value={transaction.customerId?.name || 'Customer'}
+          />
+          <TransactionMeta
+            icon="clock"
+            value={formatDateTime(transaction.createdAt)}
+          />
+        </View>
         {vehicle ? (
-          <Text style={styles.copy} numberOfLines={1}>
-            {vehicle}
-          </Text>
+          <TransactionMeta icon="truck" value={vehicle} />
         ) : null}
-        <View style={styles.rowFooter}>
-          <Text style={styles.rowFooterText}>View transaction details</Text>
+        {transaction.recordedByWorker?.name || transaction.recordedBy?.name ? (
+          <TransactionMeta
+            icon="user-check"
+            value={`Recorded by ${
+              transaction.recordedByWorker?.name ||
+              transaction.recordedBy?.name
+            }`}
+          />
+        ) : null}
+        <View style={styles.viewDetails}>
+          <Text style={styles.viewDetailsText}>View full details</Text>
           <Feather name="chevron-right" size={16} color={colors.primary} />
         </View>
-      </Card>
-    </ListItemPressable>
+      </ListItemPressable>
+    </Card>
   );
 };
+
+const TransactionStatusPill = ({status}: {status: string}) => (
+  <View
+    style={[
+      styles.statusPill,
+      status === 'Paid' && styles.statusPaid,
+      status === 'Pending' && styles.statusPending,
+      status === 'Failed' && styles.statusFailed,
+      status === 'Refunded' && styles.statusRefunded,
+    ]}
+  >
+    <Feather
+      name={transactionStatusIcon(status)}
+      size={12}
+      color={transactionStatusColor(status)}
+    />
+    <Text
+      style={[
+        styles.statusText,
+        status === 'Paid' && styles.statusPaidText,
+        status === 'Pending' && styles.statusPendingText,
+        status === 'Failed' && styles.statusFailedText,
+        status === 'Refunded' && styles.statusRefundedText,
+      ]}
+    >
+      {transactionStatusLabel(status)}
+    </Text>
+  </View>
+);
+
+const TransactionMeta = ({icon, value}: {icon: string; value: string}) => (
+  <View style={styles.transactionMeta}>
+    <Feather name={icon} size={13} color={colors.muted} />
+    <Text style={styles.transactionMetaText} numberOfLines={1}>
+      {value}
+    </Text>
+  </View>
+);
+
+const DetailCardHeading = ({
+  icon,
+  title,
+}: {
+  icon: string;
+  title: string;
+}) => (
+  <View style={styles.detailCardHeading}>
+    <View style={styles.detailIcon}>
+      <Feather name={icon} size={15} color={colors.primary} />
+    </View>
+    <Text style={styles.detailCardTitle}>{title}</Text>
+  </View>
+);
 
 const SummaryValue = ({
   icon,
@@ -468,7 +599,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.primaryDark,
   },
-  transactionCard: { gap: 7, borderRadius: 14, paddingVertical: 11 },
+  transactionCard: { borderRadius: 17, paddingVertical: 12 },
+  transactionDetailsTap: { gap: 10 },
   transactionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -480,43 +612,73 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 9,
   },
-  cashIcon: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: colors.paleBlue,
-  },
-  amount: { fontSize: 16, fontWeight: '900', color: colors.ink, flexShrink: 1 },
-  status: {
-    overflow: 'hidden',
-    borderRadius: 11,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    backgroundColor: colors.canvas,
-    fontSize: 10,
-    fontWeight: '800',
+  amountCopy: { flex: 1, minWidth: 0, gap: 2 },
+  amountLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
     color: colors.muted,
   },
-  statusPaid: { color: colors.success, backgroundColor: '#E8F5EE' },
-  statusPending: { color: '#A15C00', backgroundColor: '#FFF4E5' },
-  statusFailed: { color: colors.danger, backgroundColor: '#FDECEA' },
-  statusRefunded: { color: '#6941C6', backgroundColor: '#F4EBFF' },
-  title: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  cashIcon: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: colors.paleBlue,
+  },
+  amount: { fontSize: 19, fontWeight: '900', color: colors.ink, flexShrink: 1 },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    backgroundColor: colors.canvas,
+  },
+  statusText: { fontSize: 10, fontWeight: '800' },
+  statusPaid: { backgroundColor: '#E8F5EE' },
+  statusPending: { backgroundColor: '#FFF4E5' },
+  statusFailed: { backgroundColor: '#FDECEA' },
+  statusRefunded: { backgroundColor: '#F4EBFF' },
+  statusPaidText: { color: colors.success },
+  statusPendingText: { color: '#A15C00' },
+  statusFailedText: { color: colors.danger },
+  statusRefundedText: { color: '#6941C6' },
+  transactionTitle: { fontSize: 14, fontWeight: '700', color: colors.ink },
   copy: { fontSize: 12, lineHeight: 17, color: colors.muted },
-  rowFooter: {
+  transactionMetaRow: {
     minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  transactionMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
+  transactionMetaText: {
+    flexShrink: 1,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.muted,
+  },
+  viewDetails: {
+    minHeight: 34,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-    paddingTop: 6,
+    paddingTop: 8,
   },
-  rowFooterText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  viewDetailsText: { fontSize: 12, fontWeight: '700', color: colors.primary },
   pagination: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -535,40 +697,52 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paleBlue,
   },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: colors.ink },
-  detailAmount: {
-    alignItems: 'center',
-    gap: 3,
-    padding: 14,
-    borderRadius: 14,
-    backgroundColor: colors.paleBlue,
-  },
-  detailAmountLabel: { fontSize: 11, fontWeight: '600', color: colors.muted },
-  detailAmountValue: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: colors.primaryDark,
-  },
-  detailRow: {
+  detailHero: { gap: 9, borderRadius: 18, padding: 16 },
+  detailHeroHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
+  },
+  detailHeroIcon: {
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: colors.paleBlue,
+  },
+  detailHeroAmount: { fontSize: 27, fontWeight: '900', color: colors.ink },
+  detailHeroTitle: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  detailHeroCopy: { fontSize: 12, lineHeight: 18, color: colors.muted },
+  detailCard: { gap: 7, borderRadius: 17 },
+  detailCardHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 2,
+  },
+  detailIcon: {
+    width: 31,
+    height: 31,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
+  },
+  detailCardTitle: { fontSize: 14, fontWeight: '800', color: colors.ink },
+  detailRow: {
+    gap: 3,
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  detailLabel: { flex: 1, fontSize: 12, color: colors.muted },
+  detailLabel: { fontSize: 11, fontWeight: '600', color: colors.muted },
   detailValue: {
-    flex: 1,
-    textAlign: 'right',
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.ink,
     fontWeight: '600',
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.ink,
-    marginTop: 4,
   },
 });
 

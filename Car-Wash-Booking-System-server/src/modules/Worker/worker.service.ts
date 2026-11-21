@@ -326,9 +326,17 @@ const getMyCashTransactionsFromDB = async (
   }
   const page = Math.max(1, Math.floor(Number(filters.page) || 1));
   const limit = Math.min(100, Math.max(1, Math.floor(Number(filters.limit) || 20)));
+  const workerObjectId = new Types.ObjectId(workerId);
+  const assignedBookingIds = await Booking.distinct('_id', {
+    workerId: workerObjectId,
+    isDeleted: false,
+  });
   const query: Record<string, unknown> = {
     provider: 'Cash',
-    recordedByWorker: new Types.ObjectId(workerId),
+    $or: [
+      {recordedByWorker: workerObjectId},
+      {bookingId: {$in: assignedBookingIds}},
+    ],
   };
   if (filters.status) query.status = filters.status;
   const createdAt: Record<string, Date> = {};
@@ -350,6 +358,8 @@ const getMyCashTransactionsFromDB = async (
         populate: {path: 'carId', select: 'registrationNumber make model'},
       })
       .populate('customerId', 'name email phone')
+      .populate('recordedByWorker', 'name')
+      .populate('recordedBy', 'name')
       .sort({createdAt: -1})
       .skip((page - 1) * limit)
       .limit(limit),
@@ -525,19 +535,12 @@ const updateAssignedBookingWork = async (
       throw new Error("Work has already been started");
     }
 
-    if (booking.status !== "Confirmed") {
-      throw new Error("Only confirmed bookings can be started");
+    if (!["Pending", "Confirmed"].includes(booking.status)) {
+      throw new Error("Only pending or confirmed bookings can be started");
     }
 
     if (!booking.beforePhoto) {
       throw new AppError(400, 'Add a before-cleaning photo before starting work');
-    }
-
-    if (scheduledStartTime.getTime() > now.getTime()) {
-      throw new AppError(
-        400,
-        'Work cannot start before the scheduled booking date and time',
-      );
     }
 
     booking.status = "InProgress";

@@ -306,21 +306,21 @@ const CustomerBookingScreen = ({navigation}: Props) => {
           .join(' '),
       );
     }
-    setSelectedSlots({});
-    try {
-      await Promise.all([slotsQuery.refetch(), membershipsQuery.refetch()]);
-    } catch {
-      setError(current =>
-        [
-          current,
-          'Bookings were processed, but availability or membership balances could not be refreshed.',
-        ]
-          .filter(Boolean)
-          .join(' '),
+    if (bookingFailures.length === 0) {
+      setCarId('');
+      setServiceId('');
+      setPaymentType('Individual');
+      setPaymentMethod('Stripe');
+      setMembershipId('');
+      const currentMonth = new Date();
+      setMonth(
+        new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1),
       );
-    } finally {
-      setIsSubmitting(false);
+      setStartDate('');
+      setEndDate('');
+      setSelectedSlots({});
     }
+    setIsSubmitting(false);
   };
 
   return (

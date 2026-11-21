@@ -340,6 +340,44 @@ describe('customer booking API', () => {
     });
   });
 
+  it('creates a society without waiting for an extra confirmation', async () => {
+    unsubscribeConfirmation();
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { _id: 'society-1', name: 'Test Society' },
+        }),
+        { status: 201, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    const request = store.dispatch(
+      customerApi.endpoints.createCustomerSociety.initiate({
+        name: 'Test Society',
+        address: '1 Test Road',
+        city: 'Test City',
+      }),
+    );
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    const confirmationRequested = Boolean(
+      getRequestUiSnapshot().confirmation,
+    );
+    if (confirmationRequested) resolveApiConfirmation(true);
+    await request.unwrap();
+
+    expect(confirmationRequested).toBe(false);
+    const fetchRequest = fetchMock.mock.calls[0][0] as Request;
+    expect(fetchRequest.url).toContain('/api/v1/societies');
+    expect(fetchRequest.method).toBe('POST');
+    expect(await fetchRequest.clone().json()).toEqual({
+      name: 'Test Society',
+      address: '1 Test Road',
+      city: 'Test City',
+    });
+  });
+
   it('starts membership purchase through the customer-only route', async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(
@@ -366,7 +404,7 @@ describe('customer booking API', () => {
     expect(await fetchRequest.clone().json()).toEqual(payload);
   });
 
-  it('does not send a mutation when its custom confirmation is cancelled', async () => {
+  it('does not send a delete mutation when its confirmation is cancelled', async () => {
     unsubscribeConfirmation();
     unsubscribeConfirmation = subscribeToRequestUi(() => {
       if (getRequestUiSnapshot().confirmation) {
@@ -375,10 +413,7 @@ describe('customer booking API', () => {
     });
 
     const request = store.dispatch(
-      customerApi.endpoints.purchaseMembership.initiate({
-        carId: '507f1f77bcf86cd799439013',
-        planId: '507f1f77bcf86cd799439014',
-      }),
+      customerApi.endpoints.deleteCustomerCar.initiate('car-1'),
     );
 
     await expect(request.unwrap()).rejects.toMatchObject({

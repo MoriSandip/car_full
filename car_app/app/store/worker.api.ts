@@ -55,6 +55,8 @@ export type WorkerCashTransaction = {
   provider: 'Cash';
   status: 'Pending' | 'Paid' | 'Failed' | 'Refunded';
   reference?: string;
+  recordedBy?: {name?: string};
+  recordedByWorker?: {name?: string};
   refundReference?: string;
   refundReason?: string;
   createdAt: string;

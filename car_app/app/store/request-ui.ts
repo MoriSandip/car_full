@@ -89,20 +89,8 @@ export const requestApiConfirmation = (endpoint: string): Promise<boolean> =>
     publish();
   });
 
-const endpointsWithoutConfirmation = new Set([
-  'customerLogin',
-  'customerRegister',
-  'workerLogin',
-  'uploadImage',
-  'requestLoginOtp',
-  'verifyLoginOtp',
-  'requestPasswordReset',
-  'resetPassword',
-]);
-
 export const requiresApiConfirmation = (endpoint: string) =>
-  !endpoint.startsWith('confirmStripe') &&
-  !endpointsWithoutConfirmation.has(endpoint);
+  endpoint.startsWith('delete');
 
 export const resolveApiConfirmation = (confirmed: boolean) => {
   const pending = confirmationQueue.shift();

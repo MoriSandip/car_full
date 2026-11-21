@@ -41,20 +41,15 @@ const scheduledStartTime = (booking: Pick<Booking, 'bookingDate' | 'bookingTime'
 
 export const canPerformBookingWorkAction = (
   booking: Pick<Booking, 'bookingDate' | 'bookingTime'>,
-  action: WorkAction,
+  _action: WorkAction,
   now: number | Date = Date.now(),
-) => {
-  const scheduledAt = scheduledStartTime(booking);
-  if (scheduledAt === null) return false;
+) => isBookingWorkDate(booking, now);
 
-  const currentTime = now instanceof Date ? now : new Date(now);
-  if (Number.isNaN(currentTime.getTime())) return false;
-  if (!isBookingWorkDate(booking, currentTime)) {
-    return false;
-  }
-
-  return action !== 'start' || scheduledAt <= currentTime.getTime();
-};
+export const shouldShowStartWorkAction = (
+  booking: Pick<Booking, 'status' | 'workStatus'>,
+) =>
+  ['Pending', 'Confirmed'].includes(booking.status) &&
+  (booking.workStatus ?? 'NotStarted') === 'NotStarted';
 
 export const isBookingWorkDate = (
   booking: Pick<Booking, 'bookingDate' | 'bookingTime'>,

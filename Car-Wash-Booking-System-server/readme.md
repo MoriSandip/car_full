@@ -84,6 +84,13 @@ access token directly. Login is rate-limited. Password recovery continues to
 use a single-use email code, so configure SMTP for password reset and email
 notifications. Rotate any previously exposed ImgBB key and configure its
 replacement only as `IMGBB_API_KEY` on the server.
+For deployed environments, add `IMGBB_API_KEY` to the server's environment
+variables/secrets and redeploy the API; adding it to a web or mobile client
+does not enable uploads.
+The mobile app currently targets a local API origin during development, so
+local image uploads also require `IMGBB_API_KEY` in
+`Car-Wash-Booking-System-server/.env`; a Vercel Production variable is not
+available to the local server process. Restart the local API after adding it.
 
 Web and mobile sign-in also offer an OTP flow for admin, customer, and worker
 accounts. Request a code with `POST /api/v1/auth/otp/request` using `role`,

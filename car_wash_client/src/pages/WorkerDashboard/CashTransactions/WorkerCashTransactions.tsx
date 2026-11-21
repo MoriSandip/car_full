@@ -72,7 +72,7 @@ const WorkerCashTransactions = () => {
             Cash transactions
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Cash payments you recorded for completed bookings.
+            Cash collections recorded for your assigned bookings.
           </p>
         </div>
         <button
@@ -184,6 +184,7 @@ const WorkerCashTransactions = () => {
                       <TableHead>Customer</TableHead>
                       <TableHead>Booking</TableHead>
                       <TableHead>Vehicle</TableHead>
+                      <TableHead>Recorded by</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Reference</TableHead>
@@ -230,6 +231,11 @@ const WorkerCashTransactions = () => {
                             ) : null}
                           </TableCell>
                           <TableCell>{vehicle || "—"}</TableCell>
+                          <TableCell>
+                            {transaction.recordedByWorker?.name ||
+                              transaction.recordedBy?.name ||
+                              "—"}
+                          </TableCell>
                           <TableCell className="whitespace-nowrap font-semibold">
                             {formatMoney(transaction.amount)}
                           </TableCell>
@@ -265,7 +271,7 @@ const WorkerCashTransactions = () => {
                 No cash transactions found
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Cash payments you report while completing a job will appear here.
+                Cash collections recorded for your assigned bookings will appear here.
               </p>
             </div>
           )}

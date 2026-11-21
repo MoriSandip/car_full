@@ -54,25 +54,20 @@ const imageUpload = async (image: File): Promise<TImageUploadResult> => {
     }
 
     const result = (await response.json()) as {
-      success: boolean;
+      success?: boolean;
       message?: string;
-      data?: unknown;
+      data?: { url?: unknown };
     };
-    const uploadedImage = result.data;
+    const imageUrl = result.data?.url;
     if (
       !result.success ||
-      typeof uploadedImage !== "object" ||
-      uploadedImage === null ||
-      !("data" in uploadedImage) ||
-      typeof uploadedImage.data !== "object" ||
-      uploadedImage.data === null ||
-      !("url" in uploadedImage.data) ||
-      typeof uploadedImage.data.url !== "string"
+      typeof imageUrl !== "string" ||
+      !imageUrl.trim()
     ) {
       throw new Error(result.message || "Image upload failed.");
     }
 
-    return { data: { url: uploadedImage.data.url } };
+    return { data: { url: imageUrl } };
   } finally {
     finishRequest();
   }

@@ -639,9 +639,6 @@ const AssignedBookings: React.FC = () => {
       );
 
     if (workStatus === "NotStarted") {
-      const canStartWork =
-        scheduledStartTime !== null && scheduledStartTime <= now;
-
       return (
         <div className="space-y-2">
           {cleaningDetails}
@@ -651,8 +648,7 @@ const AssignedBookings: React.FC = () => {
               busy ||
               isUpdating ||
               isSavingProgress ||
-              booking.status !== "Confirmed" ||
-              !canStartWork ||
+              !["Pending", "Confirmed"].includes(booking.status) ||
               !booking.beforePhoto
             }
             onClick={() => handleWorkAction(booking, "start")}
@@ -660,11 +656,6 @@ const AssignedBookings: React.FC = () => {
             <Play className="mr-1 h-4 w-4" />
             Start Work
           </Button>
-          {!canStartWork && (
-            <span className="block text-xs text-muted-foreground">
-              Available at the scheduled booking time
-            </span>
-          )}
         </div>
       );
     }

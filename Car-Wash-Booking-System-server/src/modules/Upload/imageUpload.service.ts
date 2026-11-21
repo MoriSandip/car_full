@@ -49,7 +49,7 @@ const uploadImage = async (base64Image: string, mimeType: string) => {
   if (!config.imgbb_api_key) {
     throw new AppError(
       httpStatus.SERVICE_UNAVAILABLE,
-      'Image uploads are not configured on the server.',
+      'Image upload configuration is missing: IMGBB_API_KEY.',
     );
   }
 

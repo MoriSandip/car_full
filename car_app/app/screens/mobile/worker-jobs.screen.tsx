@@ -43,6 +43,7 @@ import {
   canPerformBookingWorkAction,
   canPerformWorkAction,
   isBookingWorkDate,
+  shouldShowStartWorkAction,
   type WorkAction,
 } from '../../store/worker-workflow';
 
@@ -188,7 +189,7 @@ const WorkerJobsScreen = () => {
     if (!canPerformBookingWorkAction(booking, action, now)) {
       setActionError(
         action === 'start'
-          ? 'Work can only start on the booking date, at or after the scheduled time.'
+          ? 'Work can only start on the booking date.'
           : 'Work actions are only allowed on the booking date.',
       );
       return;
@@ -543,6 +544,7 @@ const JobCard = ({
   progressDisabled: boolean;
   actionError: string;
 }) => {
+  console.log('job', job);
   const [notes, setNotes] = useState(job.workerNotes || '');
   const [photoError, setPhotoError] = useState('');
   const [photoPreviews, setPhotoPreviews] = useState<{
@@ -1144,9 +1146,7 @@ const JobCard = ({
             }
           />
         </View>
-        {!isFinal &&
-        job.status === 'Confirmed' &&
-        workStatus === 'NotStarted' ? (
+        {shouldShowStartWorkAction(job) ? (
           <>
             {!job.beforePhoto ? (
               <ActionButton
@@ -1280,9 +1280,7 @@ const JobCard = ({
             workStatus !== 'Completed' &&
             !otherActionsAllowed)) ? (
           <Text style={styles.copy}>
-            {isBookingDateToday
-              ? 'Start is available at the scheduled booking time.'
-              : 'Work actions are only available on the booking date.'}
+            Work actions are only available on the booking date.
           </Text>
         ) : null}
         {isFinal ? <Text style={styles.copy}>This job is closed.</Text> : null}
