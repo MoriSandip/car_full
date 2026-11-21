@@ -12,12 +12,11 @@ import {
 import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
-  Card,
   colors,
   InfoMessage,
+  LoadingSkeleton,
   LoadingMessage,
   Page,
-  PageTitle,
 } from '../../components/mobile/ui';
 import {
   useCreateCustomerBookingMutation,
@@ -326,11 +325,6 @@ const CustomerBookingScreen = ({navigation}: Props) => {
 
   return (
     <Page>
-      <PageTitle compact
-        title="Book a wash"
-        subtitle="Choose your car and service, then select a date range and a time for each available day."
-      />
-
       <View style={styles.bookingIntro}>
         <View style={styles.introIcon}>
           <Feather name="droplet" size={22} color={colors.white} />
@@ -345,7 +339,7 @@ const CustomerBookingScreen = ({navigation}: Props) => {
       </View>
 
       {servicesQuery.isLoading || carsQuery.isLoading ? (
-        <LoadingMessage text="Loading cars and services..." />
+        <LoadingSkeleton rows={3} />
       ) : servicesQuery.isError || carsQuery.isError ? (
         <>
           <InfoMessage text="Could not load cars or services. Check your connection and retry." variant="error" />
@@ -425,7 +419,7 @@ const CustomerBookingScreen = ({navigation}: Props) => {
             <ActivityIndicator size="small" color={colors.primary} />
           ) : null}
         </View>
-        <Card style={styles.calendarCard}>
+        <View style={styles.calendarCard}>
           <View style={styles.fieldLabelRow}>
             <Text style={styles.fieldLabel}>DATE RANGE</Text>
             <Text style={styles.fieldHint}>Required</Text>
@@ -536,7 +530,7 @@ const CustomerBookingScreen = ({navigation}: Props) => {
               <Text style={styles.clearRange}>Clear date range</Text>
             </Pressable>
           ) : null}
-        </Card>
+        </View>
         {!serviceId ? (
           <InfoMessage text="Choose a service first to load this month's schedule." />
         ) : slotsQuery.isError ? (
@@ -968,7 +962,19 @@ const SummaryRow = ({
 );
 
 const styles = StyleSheet.create({
-  section: {gap: 10},
+  section: {
+    gap: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E1E9EE',
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    shadowColor: '#173044',
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.06,
+    shadowRadius: 9,
+    elevation: 2,
+  },
   sectionTitle: {fontSize: 16, fontWeight: '800', color: colors.ink},
   stepHeading: {flexDirection: 'row', alignItems: 'center', gap: 10},
   stepNumber: {
@@ -1139,13 +1145,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   calendarCard: {
-    padding: 16,
     gap: 14,
-    borderColor: '#DDE7ED',
-    borderRadius: 20,
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 2,
   },
   monthHeader: {
     flexDirection: 'row',

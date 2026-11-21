@@ -1,6 +1,9 @@
-import {StyleSheet} from 'react-native';
+import { StyleSheet } from 'react-native';
 
 const styles = StyleSheet.create({
+  keyboardAvoiding: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

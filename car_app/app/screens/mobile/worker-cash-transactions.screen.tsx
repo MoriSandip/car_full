@@ -1,23 +1,17 @@
-import React, {useMemo, useState} from 'react';
-import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
   Card,
   colors,
   DetailsSheet,
+  FilterBottomSheet,
   InfoMessage,
   ListItemPressable,
-  LoadingMessage,
+  LoadingSkeleton,
   Page,
-  PageTitle,
+  SearchFilterBar,
 } from '../../components/mobile/ui';
 import {
   useGetMyCashTransactionsQuery,
@@ -25,12 +19,12 @@ import {
 } from '../../store/worker.api';
 
 type StatusFilter = '' | 'Pending' | 'Paid' | 'Failed' | 'Refunded';
-const statusFilters: {label: string; value: StatusFilter}[] = [
-  {label: 'All', value: ''},
-  {label: 'Received', value: 'Paid'},
-  {label: 'Pending', value: 'Pending'},
-  {label: 'Failed', value: 'Failed'},
-  {label: 'Refunded', value: 'Refunded'},
+const statusFilters: { label: string; value: StatusFilter }[] = [
+  { label: 'All', value: '' },
+  { label: 'Received', value: 'Paid' },
+  { label: 'Pending', value: 'Pending' },
+  { label: 'Failed', value: 'Failed' },
+  { label: 'Refunded', value: 'Refunded' },
 ];
 
 const formatMoney = (amount: number) => `₹${Number(amount || 0).toFixed(2)}`;
@@ -66,95 +60,58 @@ const formatDateTime = (value?: string) => {
 const WorkerCashTransactionsScreen = () => {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<StatusFilter>('');
+  const [draftStatus, setDraftStatus] = useState<StatusFilter>(status);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [search, setSearch] = useState('');
   const [selectedTransaction, setSelectedTransaction] =
     useState<WorkerCashTransaction | null>(null);
-  const {data, isLoading, isFetching, isError, refetch} =
+  const { data, isLoading, isFetching, isError, refetch } =
     useGetMyCashTransactionsQuery({
       page,
       limit: 20,
-      ...(status ? {status} : {}),
+      ...(status ? { status } : {}),
     });
   const transactions = useMemo(() => data?.data ?? [], [data?.data]);
+  const visibleTransactions = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return transactions;
+    return transactions.filter(transaction =>
+      [
+        formatMoney(transaction.amount),
+        transaction.status,
+        transaction.reference,
+        transaction.customerId?.name,
+        transaction.customerId?.phone,
+        transaction.customerId?.email,
+        transaction.bookingId?.serviceNameSnapshot,
+        transaction.bookingId?.bookingDate,
+        transaction.bookingId?.bookingTime,
+        transaction.bookingId?.status,
+        transaction.bookingId?.carId?.registrationNumber,
+        transaction.bookingId?.carId?.make,
+        transaction.bookingId?.carId?.model,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [search, transactions]);
   const summary = data?.meta?.summary;
   const totalPages = Math.max(1, data?.meta?.totalPages ?? 1);
 
   return (
     <Page
-      refreshControl={
-        <RefreshControl
-          refreshing={isFetching}
-          onRefresh={async () => {
-            await refetch();
-          }}
-          tintColor={colors.primary}
+      listData={isLoading || isError ? [] : visibleTransactions}
+      listKeyExtractor={transaction => transaction._id}
+      renderListItem={({ item }) => (
+        <CashTransactionRow
+          transaction={item}
+          onPress={() => setSelectedTransaction(item)}
         />
-      }>
-      <PageTitle
-        compact
-        title="Cash transactions"
-        subtitle="Cash payments you recorded for completed bookings."
-      />
-      <View style={styles.summary}>
-        <SummaryValue
-          icon="dollar-sign"
-          label="Cash received"
-          value={formatMoney(summary?.paidAmount ?? 0)}
-        />
-        <SummaryValue
-          icon="check-circle"
-          label="Transactions"
-          value={String(summary?.transactionCount ?? 0)}
-        />
-        <SummaryValue
-          icon="rotate-ccw"
-          label="Refunded"
-          value={formatMoney(summary?.refundedAmount ?? 0)}
-        />
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filters}>
-        {statusFilters.map(filter => (
-          <Pressable
-            key={filter.value || 'all'}
-            accessibilityRole="button"
-            accessibilityState={{selected: status === filter.value}}
-            onPress={() => {
-              setStatus(filter.value);
-              setPage(1);
-            }}
-            style={[
-              styles.filter,
-              status === filter.value && styles.filterSelected,
-            ]}>
-            <Text
-              style={[
-                styles.filterText,
-                status === filter.value && styles.filterTextSelected,
-              ]}>
-              {filter.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {isLoading ? (
-        <LoadingMessage text="Loading cash transactions..." />
-      ) : isError ? (
-        <InfoMessage
-          text="Cash transactions could not be loaded. Pull down to retry."
-          variant="error"
-        />
-      ) : transactions.length ? (
-        <View style={styles.list}>
-          {transactions.map(transaction => (
-            <CashTransactionRow
-              key={transaction._id}
-              transaction={transaction}
-              onPress={() => setSelectedTransaction(transaction)}
-            />
-          ))}
+      )}
+      listFooter={
+        transactions.length && !isLoading && !isError ? (
           <View style={styles.pagination}>
             <ActionButton
               title="Previous"
@@ -174,15 +131,107 @@ const WorkerCashTransactionsScreen = () => {
               style={styles.pageButton}
             />
           </View>
+        ) : null
+      }
+      refreshControl={
+        <RefreshControl
+          refreshing={isFetching}
+          onRefresh={async () => {
+            await refetch();
+          }}
+          tintColor={colors.primary}
+        />
+      }
+    >
+      <View style={styles.summary}>
+        <SummaryValue
+          icon="dollar-sign"
+          label="Cash received"
+          value={formatMoney(summary?.paidAmount ?? 0)}
+        />
+        <SummaryValue
+          icon="check-circle"
+          label="Transactions"
+          value={String(summary?.transactionCount ?? 0)}
+        />
+        <SummaryValue
+          icon="rotate-ccw"
+          label="Refunded"
+          value={formatMoney(summary?.refundedAmount ?? 0)}
+        />
+      </View>
+      <SearchFilterBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search cash transactions"
+        filterAccessibilityLabel={`Filter cash transactions, currently ${
+          statusFilters.find(filter => filter.value === status)?.label || 'All'
+        }`}
+        hasActiveFilters={Boolean(status)}
+        onFilterPress={() => {
+          setDraftStatus(status);
+          setFilterVisible(true);
+        }}
+      />
+      <View style={styles.activeFilters}>
+        <Text style={styles.activeFilterLabel}>Showing</Text>
+        <View style={styles.activeFilterChip}>
+          <Text style={styles.activeFilterText}>
+            {statusFilters.find(filter => filter.value === status)?.label ||
+              'All'}
+          </Text>
         </View>
-      ) : (
+      </View>
+      <FilterBottomSheet
+        visible={filterVisible}
+        setVisible={setFilterVisible}
+        title="Filter transactions"
+        subtitle="Choose which cash transaction statuses to show"
+        groups={[
+          {
+            key: 'status',
+            title: 'Transaction status',
+            value: draftStatus,
+            defaultValue: '',
+            options: statusFilters,
+            onChange: value =>
+              setDraftStatus(
+                statusFilters.find(filter => filter.value === value)?.value ||
+                  '',
+              ),
+          },
+        ]}
+        onApply={() => {
+          setStatus(draftStatus);
+          setPage(1);
+        }}
+      />
+
+      {isLoading ? (
+        <LoadingSkeleton rows={3} />
+      ) : isError ? (
+        <InfoMessage
+          text="Cash transactions could not be loaded. Pull down to retry."
+          variant="error"
+        />
+      ) : visibleTransactions.length ? null : (
         <Card style={styles.emptyCard}>
           <View style={styles.emptyIcon}>
-            <Feather name="dollar-sign" size={19} color={colors.primary} />
+            <Feather
+              name={search.trim() || status ? 'search' : 'dollar-sign'}
+              size={19}
+              color={colors.primary}
+            />
           </View>
-          <Text style={styles.emptyTitle}>No cash transactions yet</Text>
+          <Text style={styles.emptyTitle}>
+            {search.trim() || status
+              ? 'No matching transactions'
+              : 'No cash transactions yet'}
+          </Text>
           <Text style={styles.copy}>
-            Cash payments you report while completing a job will appear here.
+            {search.trim() || status
+              ? 'Try another search or transaction status filter.'
+              : 'Cash payments you report while completing a job will appear here.'}
           </Text>
         </Card>
       )}
@@ -190,7 +239,8 @@ const WorkerCashTransactionsScreen = () => {
       <DetailsSheet
         visible={Boolean(selectedTransaction)}
         setVisible={visible => !visible && setSelectedTransaction(null)}
-        title="Cash transaction details">
+        title="Cash transaction details"
+      >
         {selectedTransaction ? (
           <>
             <View style={styles.detailAmount}>
@@ -243,17 +293,21 @@ const WorkerCashTransactionsScreen = () => {
                 />
                 <TransactionDetail
                   title="Vehicle"
-                  value={[
-                    selectedTransaction.bookingId.carId?.registrationNumber,
-                    selectedTransaction.bookingId.carId?.make,
-                    selectedTransaction.bookingId.carId?.model,
-                  ]
-                    .filter(Boolean)
-                    .join(' ') || '—'}
+                  value={
+                    [
+                      selectedTransaction.bookingId.carId?.registrationNumber,
+                      selectedTransaction.bookingId.carId?.make,
+                      selectedTransaction.bookingId.carId?.model,
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || '—'
+                  }
                 />
                 <TransactionDetail
                   title="Scheduled"
-                  value={`${formatDate(selectedTransaction.bookingId.bookingDate)} · ${selectedTransaction.bookingId.bookingTime}`}
+                  value={`${formatDate(
+                    selectedTransaction.bookingId.bookingDate,
+                  )} · ${selectedTransaction.bookingId.bookingTime}`}
                 />
                 <TransactionDetail
                   title="Customer"
@@ -293,12 +347,14 @@ const CashTransactionRow = ({
   ]
     .filter(Boolean)
     .join(' ');
-  const title =
-    transaction.bookingId?.serviceNameSnapshot || 'Cash payment';
+  const title = transaction.bookingId?.serviceNameSnapshot || 'Cash payment';
   return (
     <ListItemPressable
-      accessibilityLabel={`View ${formatMoney(transaction.amount)} cash transaction details`}
-      onPress={onPress}>
+      accessibilityLabel={`View ${formatMoney(
+        transaction.amount,
+      )} cash transaction details`}
+      onPress={onPress}
+    >
       <Card style={styles.transactionCard}>
         <View style={styles.transactionHeader}>
           <View style={styles.amountGroup}>
@@ -317,7 +373,8 @@ const CashTransactionRow = ({
               transaction.status === 'Failed' && styles.statusFailed,
               transaction.status === 'Refunded' && styles.statusRefunded,
             ]}
-            numberOfLines={1}>
+            numberOfLines={1}
+          >
             {transaction.status}
           </Text>
         </View>
@@ -378,7 +435,7 @@ const TransactionDetail = ({
 );
 
 const styles = StyleSheet.create({
-  summary: {flexDirection: 'row', gap: 7},
+  summary: { flexDirection: 'row', gap: 7 },
   summaryCard: {
     flex: 1,
     minWidth: 0,
@@ -396,29 +453,35 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: colors.paleBlue,
   },
-  summaryValue: {fontSize: 13, fontWeight: '800', color: colors.ink},
-  summaryLabel: {fontSize: 9, fontWeight: '600', color: colors.muted},
-  filters: {flexDirection: 'row', gap: 7, paddingRight: 4},
-  filter: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    backgroundColor: colors.white,
+  summaryValue: { fontSize: 13, fontWeight: '800', color: colors.ink },
+  summaryLabel: { fontSize: 9, fontWeight: '600', color: colors.muted },
+  activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  activeFilterLabel: { fontSize: 11, fontWeight: '600', color: colors.muted },
+  activeFilterChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
   },
-  filterSelected: {backgroundColor: colors.paleBlue, borderColor: colors.primary},
-  filterText: {fontSize: 12, fontWeight: '600', color: colors.muted},
-  filterTextSelected: {color: colors.primaryDark},
-  list: {gap: 9},
-  transactionCard: {gap: 7, borderRadius: 14, paddingVertical: 11},
+  activeFilterText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.primaryDark,
+  },
+  transactionCard: { gap: 7, borderRadius: 14, paddingVertical: 11 },
   transactionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
   },
-  amountGroup: {flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8},
+  amountGroup: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   cashIcon: {
     width: 32,
     height: 32,
@@ -427,7 +490,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.paleBlue,
   },
-  amount: {fontSize: 16, fontWeight: '900', color: colors.ink, flexShrink: 1},
+  amount: { fontSize: 16, fontWeight: '900', color: colors.ink, flexShrink: 1 },
   status: {
     overflow: 'hidden',
     borderRadius: 11,
@@ -438,12 +501,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.muted,
   },
-  statusPaid: {color: colors.success, backgroundColor: '#E8F5EE'},
-  statusPending: {color: '#A15C00', backgroundColor: '#FFF4E5'},
-  statusFailed: {color: colors.danger, backgroundColor: '#FDECEA'},
-  statusRefunded: {color: '#6941C6', backgroundColor: '#F4EBFF'},
-  title: {fontSize: 14, fontWeight: '700', color: colors.ink},
-  copy: {fontSize: 12, lineHeight: 17, color: colors.muted},
+  statusPaid: { color: colors.success, backgroundColor: '#E8F5EE' },
+  statusPending: { color: '#A15C00', backgroundColor: '#FFF4E5' },
+  statusFailed: { color: colors.danger, backgroundColor: '#FDECEA' },
+  statusRefunded: { color: '#6941C6', backgroundColor: '#F4EBFF' },
+  title: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  copy: { fontSize: 12, lineHeight: 17, color: colors.muted },
   rowFooter: {
     minHeight: 38,
     flexDirection: 'row',
@@ -453,16 +516,16 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingTop: 6,
   },
-  rowFooterText: {fontSize: 12, fontWeight: '700', color: colors.primary},
+  rowFooterText: { fontSize: 12, fontWeight: '700', color: colors.primary },
   pagination: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
   },
-  pageButton: {flex: 1},
-  pageText: {fontSize: 12, color: colors.muted},
-  emptyCard: {alignItems: 'flex-start', gap: 9, borderRadius: 15},
+  pageButton: { flex: 1 },
+  pageText: { fontSize: 12, color: colors.muted },
+  emptyCard: { alignItems: 'flex-start', gap: 9, borderRadius: 15 },
   emptyIcon: {
     width: 42,
     height: 42,
@@ -471,7 +534,7 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: colors.paleBlue,
   },
-  emptyTitle: {fontSize: 15, fontWeight: '800', color: colors.ink},
+  emptyTitle: { fontSize: 15, fontWeight: '800', color: colors.ink },
   detailAmount: {
     alignItems: 'center',
     gap: 3,
@@ -479,8 +542,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.paleBlue,
   },
-  detailAmountLabel: {fontSize: 11, fontWeight: '600', color: colors.muted},
-  detailAmountValue: {fontSize: 24, fontWeight: '900', color: colors.primaryDark},
+  detailAmountLabel: { fontSize: 11, fontWeight: '600', color: colors.muted },
+  detailAmountValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: colors.primaryDark,
+  },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -489,7 +556,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  detailLabel: {flex: 1, fontSize: 12, color: colors.muted},
+  detailLabel: { flex: 1, fontSize: 12, color: colors.muted },
   detailValue: {
     flex: 1,
     textAlign: 'right',
@@ -497,7 +564,12 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontWeight: '600',
   },
-  sectionTitle: {fontSize: 14, fontWeight: '800', color: colors.ink, marginTop: 4},
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.ink,
+    marginTop: 4,
+  },
 });
 
 export default WorkerCashTransactionsScreen;

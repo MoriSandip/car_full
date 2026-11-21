@@ -15,9 +15,8 @@ import {
   Card,
   colors,
   InfoMessage,
-  LoadingMessage,
+  LoadingSkeleton,
   Page,
-  PageTitle,
 } from '../../components/mobile/ui';
 import {
   useGetMyAttendanceQuery,
@@ -137,13 +136,8 @@ const WorkerAttendanceScreen = () => {
         />
       }
     >
-      <PageTitle
-        compact
-        title="My attendance"
-        subtitle="Take a selfie to record today's punch in and punch out."
-      />
       {isLoading ? (
-        <LoadingMessage text="Loading today's attendance..." />
+        <LoadingSkeleton rows={2} />
       ) : isError ? (
         <InfoMessage
           text="Could not load attendance. Please refresh."

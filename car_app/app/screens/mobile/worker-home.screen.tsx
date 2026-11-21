@@ -5,7 +5,7 @@ import {
   colors,
   DetailsSheet,
   InfoMessage,
-  LoadingMessage,
+  LoadingSkeleton,
   ListItemPressable,
   Page,
 } from '../../components/mobile/ui';
@@ -18,6 +18,12 @@ import Feather from 'react-native-vector-icons/Feather';
 
 type Props = BottomTabScreenProps<NavigatorParamList, 'WorkerDashboard'>;
 
+const formatMoney = (amount: number) =>
+  `₹${Number(amount || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
 const WorkerHomeScreen = ({navigation}: Props) => {
   const user = useAppSelector(state => state.auth.user);
   const [selectedJob, setSelectedJob] = useState<Booking | null>(null);
@@ -27,6 +33,77 @@ const WorkerHomeScreen = ({navigation}: Props) => {
 
   return (
     <Page
+      listData={
+        isLoading || isError
+          ? []
+          : dashboard?.recentBookings?.slice(0, 4) ?? []
+      }
+      listKeyExtractor={job => job._id}
+      renderListItem={({item: job}) => {
+        const date = new Date(job.bookingDate);
+        const dateLabel = Number.isNaN(date.getTime())
+          ? 'Date unavailable'
+          : date.toLocaleDateString(undefined, {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+            });
+        return (
+          <ListItemPressable
+            accessibilityLabel={`View ${job.serviceNameSnapshot || 'job'} details`}
+            onPress={() => setSelectedJob(job)}>
+            <Card style={styles.jobCard}>
+              <View style={styles.jobCardHeader}>
+                <View style={styles.jobIcon}>
+                  <Feather name="droplet" size={18} color={colors.primary} />
+                </View>
+                <View style={styles.jobHeading}>
+                  <Text style={styles.jobTitle} numberOfLines={2}>
+                    {job.serviceNameSnapshot || 'Car wash'}
+                  </Text>
+                  <Text style={styles.jobDate} numberOfLines={1}>
+                    {dateLabel} · {job.bookingTime}
+                  </Text>
+                </View>
+                <View style={styles.statusBadge}>
+                  <Text style={styles.status} numberOfLines={1}>
+                    {job.workStatus || job.status}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.jobDivider} />
+              <JobDetail
+                icon="map-pin"
+                text={[entityLabel(job.societyId), entityLabel(job.flatId)]
+                  .filter(Boolean)
+                  .join(' · ') || 'Location unavailable'}
+              />
+              <View style={styles.jobFooter}>
+                <View style={styles.vehicleDetail}>
+                  <JobDetail
+                    icon="truck"
+                    text={entityLabel(job.carId) || 'Car details unavailable'}
+                  />
+                </View>
+                <View style={styles.amountPill}>
+                  <Text style={styles.amountLabel}>BOOKING TOTAL</Text>
+                  <Text
+                    style={styles.jobAmount}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}>
+                    {formatMoney(job.amountPayable)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.listItemFooter}>
+                <Text style={styles.listItemFooterText}>View job details</Text>
+                <Feather name="chevron-right" size={16} color={colors.primary} />
+              </View>
+            </Card>
+          </ListItemPressable>
+        );
+      }}
       refreshControl={
         <RefreshControl
           refreshing={isFetching}
@@ -72,7 +149,7 @@ const WorkerHomeScreen = ({navigation}: Props) => {
         />
       ) : null}
       {isLoading ? (
-        <LoadingMessage text="Loading your work..." />
+        <LoadingSkeleton rows={3} />
       ) : dashboard ? (
         <>
           <View style={styles.sectionHeading}>
@@ -121,63 +198,7 @@ const WorkerHomeScreen = ({navigation}: Props) => {
         </Pressable>
       </View>
       {dashboard?.recentBookings?.length ? (
-        dashboard.recentBookings.slice(0, 4).map(job => {
-          const date = new Date(job.bookingDate);
-          const dateLabel = Number.isNaN(date.getTime())
-            ? 'Date unavailable'
-            : date.toLocaleDateString(undefined, {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short',
-              });
-          return (
-            <ListItemPressable
-              key={job._id}
-              accessibilityLabel={`View ${job.serviceNameSnapshot || 'job'} details`}
-              onPress={() => setSelectedJob(job)}>
-            <Card style={styles.jobCard}>
-              <View style={styles.jobCardHeader}>
-                <View style={styles.jobIcon}>
-                  <Feather name="droplet" size={18} color={colors.primary} />
-                </View>
-                <View style={styles.jobHeading}>
-                  <Text style={styles.jobTitle} numberOfLines={1}>
-                    {job.serviceNameSnapshot || 'Car wash'}
-                  </Text>
-                  <Text style={styles.jobDate}>
-                    {dateLabel} · {job.bookingTime}
-                  </Text>
-                </View>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.status} numberOfLines={1}>
-                    {job.workStatus || job.status}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.jobDivider} />
-              <JobDetail
-                icon="map-pin"
-                text={[entityLabel(job.societyId), entityLabel(job.flatId)]
-                  .filter(Boolean)
-                  .join(' · ') || 'Location unavailable'}
-              />
-              <View style={styles.jobFooter}>
-                <JobDetail
-                  icon="truck"
-                  text={entityLabel(job.carId) || 'Car details unavailable'}
-                />
-                <Text style={styles.jobAmount}>
-                  ₹{Number(job.amountPayable ?? 0).toLocaleString('en-IN')}
-                </Text>
-              </View>
-              <View style={styles.listItemFooter}>
-                <Text style={styles.listItemFooterText}>View job details</Text>
-                <Feather name="chevron-right" size={16} color={colors.primary} />
-              </View>
-            </Card>
-            </ListItemPressable>
-          );
-        })
+        null
       ) : !isLoading && !isError ? (
         <Card style={styles.emptyCard}>
           <View style={styles.emptyIcon}>
@@ -195,39 +216,89 @@ const WorkerHomeScreen = ({navigation}: Props) => {
         title="Assignment details">
         {selectedJob ? (
           <>
-            <WorkerDetail title="Service" value={selectedJob.serviceNameSnapshot || 'Car wash'} />
-            <WorkerDetail
-              title="Vehicle"
-              value={entityLabel(selectedJob.carId) || 'Car details unavailable'}
-            />
-            <WorkerDetail
-              title="Location"
-              value={[entityLabel(selectedJob.societyId), entityLabel(selectedJob.flatId)]
-                .filter(Boolean)
-                .join(' · ') || 'Location unavailable'}
-            />
-            <WorkerDetail
-              title="Scheduled"
-              value={`${new Date(selectedJob.bookingDate).toLocaleDateString('en-IN')} · ${selectedJob.bookingTime}`}
-            />
-            <WorkerDetail title="Booking status" value={selectedJob.status} />
-            <WorkerDetail title="Work status" value={selectedJob.workStatus || 'Not started'} />
-            <WorkerDetail title="Payment type" value={selectedJob.paymentType || '—'} />
-            <WorkerDetail
-              title="Payment method / status"
-              value={`${selectedJob.paymentMethod || '—'} · ${selectedJob.paymentStatus || '—'}`}
-            />
-            <WorkerDetail
-              title="Cash collection"
-              value={selectedJob.cashCollectionStatus || '—'}
-            />
-            <WorkerDetail
-              title="Amount"
-              value={`₹${Number(selectedJob.amountPayable || 0).toFixed(2)}`}
-            />
-            <WorkerDetail title="Booking note" value={selectedJob.remarks} />
-            <WorkerDetail title="Worker notes" value={selectedJob.workerNotes} />
-            <Text style={styles.detailSection}>Cleaning checklist</Text>
+            <View style={styles.detailHero}>
+              <View style={styles.detailHeroTop}>
+                <View style={styles.detailHeroIcon}>
+                  <Feather name="droplet" size={20} color={colors.white} />
+                </View>
+                <View style={styles.detailHeroCopy}>
+                  <Text style={styles.detailEyebrow}>ASSIGNMENT</Text>
+                  <Text style={styles.detailHeroTitle} numberOfLines={2}>
+                    {selectedJob.serviceNameSnapshot || 'Car wash'}
+                  </Text>
+                  <Text style={styles.detailHeroSubtitle} numberOfLines={1}>
+                    {entityLabel(selectedJob.carId) || 'Vehicle details unavailable'}
+                  </Text>
+                </View>
+                <View style={styles.detailStatus}>
+                  <Text style={styles.detailStatusText} numberOfLines={1}>
+                    {selectedJob.workStatus || selectedJob.status}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.detailHeroDivider} />
+              <View style={styles.detailHeroBottom}>
+                <View>
+                  <Text style={styles.detailAmountLabel}>BOOKING TOTAL</Text>
+                  <Text
+                    style={styles.detailAmount}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}>
+                    {formatMoney(selectedJob.amountPayable)}
+                  </Text>
+                </View>
+                <View style={styles.detailSchedule}>
+                  <Feather name="calendar" size={15} color="#B5E4E2" />
+                  <Text style={styles.detailScheduleText}>
+                    {new Date(selectedJob.bookingDate).toLocaleDateString('en-IN')} ·{' '}
+                    {selectedJob.bookingTime}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <DetailSection icon="clipboard" title="Booking details">
+              <WorkerDetail
+                title="Vehicle"
+                value={entityLabel(selectedJob.carId) || 'Car details unavailable'}
+              />
+              <WorkerDetail
+                title="Location"
+                value={[entityLabel(selectedJob.societyId), entityLabel(selectedJob.flatId)]
+                  .filter(Boolean)
+                  .join(' · ') || 'Location unavailable'}
+              />
+              <WorkerDetail title="Booking status" value={selectedJob.status} />
+              <WorkerDetail
+                title="Work status"
+                value={selectedJob.workStatus || 'Not started'}
+              />
+              {selectedJob.membershipId ? (
+                <WorkerDetail
+                  title="Membership"
+                  value={
+                    typeof selectedJob.membershipId === 'string'
+                      ? selectedJob.membershipId
+                      : selectedJob.membershipId._id || 'Membership wash'
+                  }
+                />
+              ) : null}
+            </DetailSection>
+
+            <DetailSection icon="credit-card" title="Payment">
+              <WorkerDetail title="Payment type" value={selectedJob.paymentType || '—'} />
+              <WorkerDetail
+                title="Method / status"
+                value={`${selectedJob.paymentMethod || '—'} · ${selectedJob.paymentStatus || '—'}`}
+              />
+              <WorkerDetail
+                title="Cash collection"
+                value={selectedJob.cashCollectionStatus || '—'}
+              />
+            </DetailSection>
+
+            <DetailSection icon="check-square" title="Cleaning checklist">
             {[
               {label: 'Exterior wash', checked: selectedJob.cleaningChecklist?.exteriorWash},
               {label: 'Interior cleaning', checked: selectedJob.cleaningChecklist?.interiorCleaning},
@@ -241,9 +312,21 @@ const WorkerHomeScreen = ({navigation}: Props) => {
                 value={checked ? 'Done' : 'Pending'}
               />
             ))}
+            </DetailSection>
+
+            {selectedJob.remarks || selectedJob.workerNotes ? (
+              <DetailSection icon="file-text" title="Notes">
+                {selectedJob.remarks ? (
+                  <WorkerDetail title="Booking note" value={selectedJob.remarks} />
+                ) : null}
+                {selectedJob.workerNotes ? (
+                  <WorkerDetail title="Worker notes" value={selectedJob.workerNotes} />
+                ) : null}
+              </DetailSection>
+            ) : null}
+
             {selectedJob.workSessions?.length ? (
-              <>
-                <Text style={styles.detailSection}>Work timeline</Text>
+              <DetailSection icon="clock" title="Work timeline">
                 {selectedJob.workSessions.map((session, index) => (
                   <WorkerDetail
                     key={`${session.startedAt}-${index}`}
@@ -251,17 +334,25 @@ const WorkerHomeScreen = ({navigation}: Props) => {
                     value={`${new Date(session.startedAt).toLocaleString('en-IN')}${session.endedAt ? ` – ${new Date(session.endedAt).toLocaleString('en-IN')}` : ' · Active'}`}
                   />
                 ))}
-              </>
+              </DetailSection>
             ) : null}
             {selectedJob.beforePhoto || selectedJob.afterPhoto ? (
-              <View style={styles.photoRow}>
-                {selectedJob.beforePhoto ? (
-                  <Image source={{uri: selectedJob.beforePhoto}} style={styles.photo} />
-                ) : null}
-                {selectedJob.afterPhoto ? (
-                  <Image source={{uri: selectedJob.afterPhoto}} style={styles.photo} />
-                ) : null}
-              </View>
+              <DetailSection icon="camera" title="Cleaning photos">
+                <View style={styles.photoRow}>
+                  {selectedJob.beforePhoto ? (
+                    <View style={styles.photoColumn}>
+                      <Text style={styles.photoLabel}>BEFORE</Text>
+                      <Image source={{uri: selectedJob.beforePhoto}} style={styles.photo} />
+                    </View>
+                  ) : null}
+                  {selectedJob.afterPhoto ? (
+                    <View style={styles.photoColumn}>
+                      <Text style={styles.photoLabel}>AFTER</Text>
+                      <Image source={{uri: selectedJob.afterPhoto}} style={styles.photo} />
+                    </View>
+                  ) : null}
+                </View>
+              </DetailSection>
             ) : null}
           </>
         ) : null}
@@ -273,8 +364,26 @@ const WorkerHomeScreen = ({navigation}: Props) => {
 const WorkerDetail = ({title, value}: {title: string; value?: string}) => (
   <View style={styles.detailRow}>
     <Text style={styles.detailLabel}>{title}</Text>
-    <Text style={styles.detailValue}>{value || '—'}</Text>
+    <Text style={styles.detailValue} selectable>
+      {value || '—'}
+    </Text>
   </View>
+);
+
+const DetailSection = ({
+  icon,
+  title,
+  children,
+}: React.PropsWithChildren<{icon: string; title: string}>) => (
+  <Card style={styles.detailCard}>
+    <View style={styles.detailCardHeading}>
+      <View style={styles.detailCardIcon}>
+        <Feather name={icon} size={15} color={colors.primary} />
+      </View>
+      <Text style={styles.detailCardTitle}>{title}</Text>
+    </View>
+    {children}
+  </Card>
 );
 
 const statTints = {
@@ -436,7 +545,14 @@ const styles = StyleSheet.create({
   sectionTitle: {fontSize: 17, fontWeight: '800', color: colors.ink},
   allJobsButton: {flexDirection: 'row', alignItems: 'center', gap: 5},
   link: {fontSize: 13, fontWeight: '700', color: colors.primary},
-  jobCard: {gap: 11, borderRadius: 18},
+  jobCard: {
+    gap: 11,
+    padding: 14,
+    borderRadius: 19,
+    borderColor: '#DCE8ED',
+    shadowOpacity: 0.07,
+    elevation: 3,
+  },
   jobCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -469,7 +585,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
-  jobAmount: {fontSize: 13, fontWeight: '800', color: colors.ink},
+  vehicleDetail: {flex: 1, minWidth: 0},
+  amountPill: {
+    maxWidth: 132,
+    minWidth: 98,
+    alignItems: 'flex-end',
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: colors.paleBlue,
+  },
+  amountLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    color: colors.muted,
+  },
+  jobAmount: {
+    maxWidth: '100%',
+    fontSize: 15,
+    fontWeight: '900',
+    color: colors.primaryDark,
+  },
   listItemFooter: {
     minHeight: 40,
     flexDirection: 'row',
@@ -480,19 +618,112 @@ const styles = StyleSheet.create({
     paddingTop: 7,
   },
   listItemFooterText: {fontSize: 12, fontWeight: '700', color: colors.primary},
+  detailHero: {
+    overflow: 'hidden',
+    gap: 14,
+    padding: 16,
+    borderRadius: 19,
+    backgroundColor: colors.primaryDark,
+  },
+  detailHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  detailHeroIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  detailHeroCopy: {flex: 1, minWidth: 0, gap: 3},
+  detailEyebrow: {
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1,
+    color: '#B5E4E2',
+  },
+  detailHeroTitle: {fontSize: 16, fontWeight: '800', color: colors.white},
+  detailHeroSubtitle: {fontSize: 11, color: 'rgba(255,255,255,0.72)'},
+  detailStatus: {
+    maxWidth: 94,
+    flexShrink: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  detailStatusText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.white,
+    textAlign: 'center',
+  },
+  detailHeroDivider: {height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.24)'},
+  detailHeroBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  detailAmountLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    color: '#B5E4E2',
+  },
+  detailAmount: {marginTop: 2, fontSize: 21, fontWeight: '900', color: colors.white},
+  detailSchedule: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+  },
+  detailScheduleText: {
+    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.84)',
+    textAlign: 'right',
+  },
+  detailCard: {gap: 8, padding: 13, borderRadius: 16},
+  detailCardHeading: {flexDirection: 'row', alignItems: 'center', gap: 9},
+  detailCardIcon: {
+    width: 29,
+    height: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
+  },
+  detailCardTitle: {fontSize: 13, fontWeight: '800', color: colors.ink},
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     gap: 12,
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
   detailLabel: {flex: 1, fontSize: 12, color: colors.muted},
-  detailValue: {flex: 1, textAlign: 'right', fontSize: 13, color: colors.ink, fontWeight: '600'},
-  detailSection: {fontSize: 14, fontWeight: '800', color: colors.ink, marginTop: 4},
-  photoRow: {flexDirection: 'row', gap: 8},
-  photo: {flex: 1, height: 130, borderRadius: 10, backgroundColor: colors.canvas},
+  detailValue: {
+    flex: 1.25,
+    minWidth: 0,
+    textAlign: 'right',
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.ink,
+    fontWeight: '600',
+  },
+  photoRow: {flexDirection: 'row', gap: 10},
+  photoColumn: {flex: 1, minWidth: 0, gap: 5},
+  photoLabel: {fontSize: 9, fontWeight: '800', letterSpacing: 0.6, color: colors.muted},
+  photo: {width: '100%', height: 130, borderRadius: 12, backgroundColor: colors.canvas},
   copy: {flex: 1, minWidth: 0, fontSize: 12, color: colors.muted, lineHeight: 17},
   emptyCard: {alignItems: 'flex-start', borderRadius: 18},
   emptyIcon: {

@@ -21,6 +21,7 @@ import {
   colors,
   DetailsSheet,
   InfoMessage,
+  LoadingSkeleton,
   LoadingMessage,
   ListItemPressable,
   Page,
@@ -63,6 +64,11 @@ const CustomerHomeScreen = ({navigation}: Props) => {
 
   return (
     <Page
+      listData={
+        bookingsQuery.isLoading || bookingsQuery.isError ? [] : upcoming
+      }
+      listKeyExtractor={booking => booking._id}
+      renderListItem={({item}) => <BookingPreview booking={item} />}
       refreshControl={
         <RefreshControl
           refreshing={bookingsQuery.isFetching || carsQuery.isFetching}
@@ -183,14 +189,10 @@ const CustomerHomeScreen = ({navigation}: Props) => {
       </View>
 
       {bookingsQuery.isLoading ? (
-        <LoadingMessage text="Loading your bookings..." />
+        <LoadingSkeleton rows={2} />
       ) : bookingsQuery.isError ? (
         <InfoMessage text="Bookings could not be loaded. Pull to refresh from My Bookings." variant="error" />
-      ) : upcoming.length ? (
-        upcoming.map(booking => (
-          <BookingPreview key={booking._id} booking={booking} />
-        ))
-      ) : (
+      ) : upcoming.length ? null : (
         <Card style={styles.emptyCard}>
           <View style={styles.emptyIcon}>
             <Feather name="calendar" size={20} color={colors.primary} />
@@ -303,6 +305,40 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
   const car = typeof booking.carId === 'string' ? null : booking.carId;
   const worker =
     typeof booking.workerId === 'string' ? null : booking.workerId;
+  const carLabel = car
+    ? [car.registrationNumber, car.make, car.model].filter(Boolean).join(' ')
+    : 'Car details unavailable';
+  const statusLabel =
+    booking.status === 'InProgress' ? 'In progress' : booking.status;
+  const statusBadgeTone =
+    booking.status === 'Completed'
+      ? styles.statusBadgeComplete
+      : booking.status === 'Cancelled'
+        ? styles.statusBadgeCancelled
+        : booking.status === 'InProgress'
+          ? styles.statusBadgeActive
+          : styles.statusBadgeUpcoming;
+  const statusTextTone =
+    booking.status === 'Completed'
+      ? styles.statusTextComplete
+      : booking.status === 'Cancelled'
+        ? styles.statusTextCancelled
+        : booking.status === 'InProgress'
+          ? styles.statusTextActive
+          : styles.statusTextUpcoming;
+  const workStatusLabel =
+    {
+      NotStarted: 'Not started',
+      Working: 'In progress',
+      Paused: 'Paused',
+      Completed: 'Completed',
+    }[booking.workStatus || 'NotStarted'];
+  const paymentStatusLabel =
+    booking.amountPayable === 0
+      ? 'Covered by membership'
+      : booking.paymentMethod === 'Cash' && booking.paymentStatus !== 'Paid'
+        ? 'Cash due on service day'
+        : booking.paymentStatus || 'Payment pending';
   const availabilityRange = singleDayAvailabilityRange(rescheduleDate);
   const slotsQuery = useGetAvailableSlotsQuery(
     {serviceId, ...availabilityRange},
@@ -393,37 +429,62 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
         accessibilityLabel={`View ${booking.serviceNameSnapshot || 'booking'} details`}
         onPress={() => setDetailsVisible(true)}
         style={styles.bookingSummary}>
-        <View style={styles.row}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {booking.serviceNameSnapshot || 'Car wash'}
-          </Text>
-          <Text style={styles.status} numberOfLines={1}>{booking.status}</Text>
+        <View style={styles.bookingCardHeader}>
+          <View style={styles.bookingServiceIcon}>
+            <Feather name="droplet" size={18} color={colors.primary} />
+          </View>
+          <View style={styles.bookingServiceCopy}>
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {booking.serviceNameSnapshot || 'Car wash'}
+            </Text>
+            <Text style={styles.bookingCar} numberOfLines={1}>
+              {carLabel}
+            </Text>
+          </View>
+          <View style={[styles.statusBadge, statusBadgeTone]}>
+            <Text
+              style={[styles.statusBadgeText, statusTextTone]}
+              numberOfLines={1}>
+              {statusLabel}
+            </Text>
+          </View>
         </View>
-        <Text style={styles.body} numberOfLines={1}>
-          {typeof booking.carId === 'string'
-            ? 'Car details unavailable'
-            : [booking.carId.registrationNumber, booking.carId.make, booking.carId.model]
-                .filter(Boolean)
-                .join(' ')}
-          {' · '}
-          {new Date(booking.bookingDate).toLocaleDateString()} · {booking.bookingTime}
-        </Text>
-        <View style={styles.bookingSummaryMeta}>
-          <Text style={[styles.body, styles.summaryAmount]} numberOfLines={1}>
-            {booking.amountPayable === 0
-              ? 'Covered by membership'
-              : booking.paymentMethod === 'Cash' &&
-                  booking.paymentStatus !== 'Paid'
-                ? `₹${booking.amountPayable} · Cash due on service day`
-                : `₹${booking.amountPayable} · ${booking.paymentStatus}`}
-          </Text>
+        <View style={styles.bookingMetaRow}>
+          <View style={styles.bookingMetaIcon}>
+            <Feather name="calendar" size={14} color={colors.primary} />
+          </View>
+          <View style={styles.bookingMetaCopy}>
+            <Text style={styles.bookingMetaLabel}>SCHEDULED</Text>
+            <Text style={styles.bookingMetaValue} numberOfLines={1}>
+              {new Date(booking.bookingDate).toLocaleDateString('en-IN', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              })}{' '}
+              · {booking.bookingTime}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.bookingCardFooter}>
+          <View style={styles.bookingAmountGroup}>
+            <Text style={styles.bookingMetaLabel}>BOOKING TOTAL</Text>
+            <Text
+              style={styles.bookingAmount}
+              numberOfLines={1}
+              adjustsFontSizeToFit>
+              {booking.amountPayable === 0
+                ? 'Membership wash'
+                : `₹${Number(booking.amountPayable).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`}
+            </Text>
+            <Text style={styles.bookingPaymentStatus} numberOfLines={1}>
+              {paymentStatusLabel}
+            </Text>
+          </View>
           <Text style={styles.bookingWorkStatus} numberOfLines={1}>
-            {{
-              NotStarted: 'Not started',
-              Working: 'In progress',
-              Paused: 'Paused',
-              Completed: 'Completed',
-            }[booking.workStatus || 'NotStarted']}
+            {workStatusLabel}
           </Text>
         </View>
       </ListItemPressable>
@@ -431,255 +492,349 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
         accessibilityLabel="Manage booking"
         onPress={() => setDetailsVisible(true)}
         style={styles.manageLink}>
-        <Text style={styles.manageLinkText}>Manage booking</Text>
+        <Text style={styles.manageLinkText}>View booking details</Text>
         <Feather name="chevron-right" size={16} color={colors.primary} />
       </ListItemPressable>
       <DetailsSheet
         visible={detailsVisible}
         setVisible={setDetailsVisible}
         title="Booking details & work timeline">
-              <Text style={styles.body}>Times shown in India time</Text>
-              <DetailRow title="Service" value={booking.serviceNameSnapshot || 'Car wash'} />
-              <DetailRow title="Booking status" value={booking.status} />
-              <DetailRow
-                title="Work status"
-                value={{
-                  NotStarted: 'Not started',
-                  Working: 'In progress',
-                  Paused: 'Paused',
-                  Completed: 'Completed',
-                }[booking.workStatus || 'NotStarted']}
-              />
-              <DetailRow
-                title="Scheduled"
-                value={`${new Date(booking.bookingDate).toLocaleDateString()} · ${booking.bookingTime}`}
-              />
-              <DetailRow
-                title="Payment"
-                value={`${booking.paymentType} · ${booking.paymentMethod || '—'} · ${booking.paymentStatus}`}
-              />
-              {booking.paymentMethod === 'Cash' ? (
-                <DetailRow
-                  title="Cash collection"
-                  value={booking.cashCollectionStatus ||
-                    (booking.paymentStatus === 'Paid' ? 'Received' : 'NotRecorded')}
-                />
-              ) : null}
-              <DetailRow
-                title="Amount"
-                value={booking.amountPayable === 0 ? 'Covered by membership' : `₹${booking.amountPayable}`}
-              />
-              <View style={styles.bookingDetailsSection}>
-                <Text style={styles.bookingDetailsHeading}>Vehicle details</Text>
-                {car?.imageUrl ? (
+        <View style={styles.bookingDetailHero}>
+          <View style={styles.bookingDetailHeroHeader}>
+            <View style={styles.bookingDetailHeroIcon}>
+              <Feather name="droplet" size={20} color={colors.primary} />
+            </View>
+            <View style={styles.bookingDetailHeroCopy}>
+              <Text style={styles.bookingDetailHeroTitle} numberOfLines={2}>
+                {booking.serviceNameSnapshot || 'Car wash'}
+              </Text>
+              <Text style={styles.bookingCar} numberOfLines={1}>
+                {carLabel}
+              </Text>
+            </View>
+            <View style={[styles.statusBadge, statusBadgeTone]}>
+              <Text
+                style={[styles.statusBadgeText, statusTextTone]}
+                numberOfLines={1}>
+                {statusLabel}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.bookingDetailDivider} />
+          <View style={styles.bookingDetailHeroFooter}>
+            <View style={styles.bookingHeroMetric}>
+              <Text style={styles.bookingMetaLabel}>SCHEDULED</Text>
+              <Text style={styles.bookingMetaValue}>
+                {new Date(booking.bookingDate).toLocaleDateString('en-IN', {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                })}{' '}
+                · {booking.bookingTime}
+              </Text>
+            </View>
+            <View style={styles.bookingHeroMetric}>
+              <Text style={styles.bookingMetaLabel}>TOTAL</Text>
+              <Text style={styles.bookingAmount}>
+                {booking.amountPayable === 0
+                  ? 'Membership'
+                  : `₹${Number(booking.amountPayable).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.timezoneHint}>
+          <Feather name="clock" size={13} color={colors.muted} />
+          <Text style={styles.timezoneText}>Times shown in India time</Text>
+        </View>
+        <View style={styles.bookingDetailsSection}>
+          <View style={styles.bookingSectionHeading}>
+            <Feather name="credit-card" size={16} color={colors.primary} />
+            <Text style={styles.bookingDetailsHeading}>Booking & payment</Text>
+          </View>
+          <DetailRow title="Booking status" value={booking.status} />
+          <DetailRow title="Work status" value={workStatusLabel} />
+          <DetailRow
+            title="Payment"
+            value={`${booking.paymentType} · ${booking.paymentMethod || '—'} · ${booking.paymentStatus}`}
+          />
+          {booking.paymentMethod === 'Cash' ? (
+            <DetailRow
+              title="Cash collection"
+              value={
+                booking.cashCollectionStatus ||
+                (booking.paymentStatus === 'Paid' ? 'Received' : 'Not recorded')
+              }
+            />
+          ) : null}
+          <DetailRow
+            title="Amount"
+            value={
+              booking.amountPayable === 0
+                ? 'Covered by membership'
+                : `₹${Number(booking.amountPayable).toFixed(2)}`
+            }
+          />
+        </View>
+        <View style={styles.bookingDetailsSection}>
+          <View style={styles.bookingSectionHeading}>
+            <Feather name="truck" size={16} color={colors.primary} />
+            <Text style={styles.bookingDetailsHeading}>Vehicle details</Text>
+          </View>
+          {car?.imageUrl ? (
+            <Image
+              source={{uri: car.imageUrl}}
+              style={styles.vehicleDetailImage}
+              resizeMode="cover"
+            />
+          ) : null}
+          <DetailRow title="Registration" value={car?.registrationNumber || '—'} />
+          <DetailRow
+            title="Make / model"
+            value={[car?.make, car?.model].filter(Boolean).join(' ') || '—'}
+          />
+          <DetailRow title="Color" value={car?.color || '—'} />
+          <DetailRow title="Vehicle type" value={car?.carType || '—'} />
+          <DetailRow title="Parking" value={car?.parkingSlot || '—'} />
+        </View>
+        <View style={styles.bookingDetailsSection}>
+          <View style={styles.bookingSectionHeading}>
+            <Feather name="user" size={16} color={colors.primary} />
+            <Text style={styles.bookingDetailsHeading}>Wash professional</Text>
+          </View>
+          {worker ? (
+            <>
+              <View style={styles.workerIdentity}>
+                {worker.imageUrl ? (
                   <Image
-                    source={{uri: car.imageUrl}}
-                    style={styles.vehicleDetailImage}
-                    resizeMode="cover"
+                    source={{uri: worker.imageUrl}}
+                    style={styles.workerAvatar}
                   />
-                ) : null}
-                <DetailRow title="Registration" value={car?.registrationNumber || '—'} />
-                <DetailRow
-                  title="Make / model"
-                  value={[car?.make, car?.model].filter(Boolean).join(' ') || '—'}
-                />
-                <DetailRow title="Color" value={car?.color || '—'} />
-                <DetailRow title="Vehicle type" value={car?.carType || '—'} />
-                <DetailRow title="Parking" value={car?.parkingSlot || '—'} />
-              </View>
-              <View style={styles.bookingDetailsSection}>
-                <Text style={styles.bookingDetailsHeading}>Wash professional</Text>
-                {worker ? (
-                  <>
-                    <View style={styles.workerIdentity}>
-                      {worker.imageUrl ? (
-                        <Image
-                          source={{uri: worker.imageUrl}}
-                          style={styles.workerAvatar}
-                        />
-                      ) : (
-                        <View style={[styles.workerAvatar, styles.workerAvatarPlaceholder]}>
-                          <Feather name="user" size={20} color={colors.primary} />
-                        </View>
-                      )}
-                      <Text style={styles.workerName}>{worker.name || 'Assigned worker'}</Text>
-                    </View>
-                    <DetailRow title="Phone" value={worker.phone || '—'} />
-                    <DetailRow title="Email" value={worker.email || '—'} />
-                    <DetailRow title="Status" value={worker.status || '—'} />
-                  </>
                 ) : (
-                  <Text style={styles.body}>A worker has not been assigned yet.</Text>
+                  <View
+                    style={[styles.workerAvatar, styles.workerAvatarPlaceholder]}>
+                    <Feather name="user" size={20} color={colors.primary} />
+                  </View>
+                )}
+                <Text style={styles.workerName}>
+                  {worker.name || 'Assigned worker'}
+                </Text>
+              </View>
+              <DetailRow title="Phone" value={worker.phone || '—'} />
+              <DetailRow title="Email" value={worker.email || '—'} />
+              <DetailRow title="Status" value={worker.status || '—'} />
+            </>
+          ) : (
+            <Text style={styles.body}>A worker has not been assigned yet.</Text>
+          )}
+        </View>
+        {booking.paymentType === 'Individual' &&
+        booking.paymentMethod !== 'Cash' &&
+        booking.paymentStatus !== 'Paid' &&
+        !['Cancelled', 'Completed'].includes(booking.status) ? (
+          <ActionButton
+            title={checkoutState.isLoading ? 'Opening checkout...' : 'Pay online'}
+            onPress={payOnline}
+            disabled={checkoutState.isLoading}
+          />
+        ) : null}
+        {!['Completed', 'Cancelled', 'InProgress'].includes(booking.status) ? (
+          <ActionButton
+            title="Reschedule"
+            variant="secondary"
+            onPress={() => {
+              const date = new Date();
+              setRescheduleDate(
+                `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+              );
+              setSelectedSlotId('');
+              setRescheduleError('');
+              setDetailsVisible(false);
+              setRescheduling(true);
+            }}
+          />
+        ) : null}
+        <View style={styles.bookingDetailsSection}>
+          <View style={styles.bookingSectionHeading}>
+            <Feather name="camera" size={16} color={colors.primary} />
+            <Text style={styles.bookingDetailsHeading}>Cleaning photos</Text>
+          </View>
+          <View style={styles.photoRow}>
+            {[
+              ['Before cleaning', booking.beforePhoto],
+              ['After cleaning', booking.afterPhoto],
+            ].map(([title, photo]) => (
+              <View key={title} style={styles.photoItem}>
+                <Text style={styles.body}>{title}</Text>
+                {photo ? (
+                  <Image source={{uri: photo}} style={styles.photo} />
+                ) : (
+                  <Text style={styles.photoPlaceholder}>Not uploaded</Text>
                 )}
               </View>
-              {booking.paymentType === 'Individual' &&
-              booking.paymentMethod !== 'Cash' &&
-              booking.paymentStatus !== 'Paid' &&
-              !['Cancelled', 'Completed'].includes(booking.status) ? (
-                <ActionButton
-                  title={checkoutState.isLoading ? 'Opening checkout...' : 'Pay online'}
-                  onPress={payOnline}
-                  disabled={checkoutState.isLoading}
-                />
-              ) : null}
-              {!['Completed', 'Cancelled', 'InProgress'].includes(booking.status) ? (
-                <ActionButton
-                  title="Reschedule"
-                  variant="secondary"
-                  onPress={() => {
-                    const date = new Date();
-                    setRescheduleDate(
-                      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
-                    );
-                    setSelectedSlotId('');
-                    setRescheduleError('');
-                    setDetailsVisible(false);
-                    setRescheduling(true);
-                  }}
-                />
-              ) : null}
-              <View style={styles.photoRow}>
-                {[
-                  ['Before cleaning', booking.beforePhoto],
-                  ['After cleaning', booking.afterPhoto],
-                ].map(([title, photo]) => (
-                  <View key={title} style={styles.photoItem}>
-                    <Text style={styles.body}>{title}</Text>
-                    {photo ? (
-                      <Image source={{uri: photo}} style={styles.photo} />
-                    ) : (
-                      <Text style={styles.photoPlaceholder}>Not uploaded</Text>
-                    )}
-                  </View>
-                ))}
-              </View>
-              <View style={styles.checklist}>
-                <Text style={styles.body}>Cleaning checklist</Text>
-                {[
-                  ['Exterior wash', 'exteriorWash'],
-                  ['Interior cleaning', 'interiorCleaning'],
-                  ['Dashboard', 'dashboard'],
-                  ['Tyre dressing', 'tyreDressing'],
-                  ['Vacuum cleaning', 'vacuumCleaning'],
-                ].map(([title, key]) => {
-                  const done = booking.cleaningChecklist?.[
-                    key as keyof NonNullable<Booking['cleaningChecklist']>
-                  ];
-                  return (
-                    <DetailRow
-                      key={key}
-                      title={title}
-                      value={done ? 'Done' : 'Pending'}
-                    />
-                  );
-                })}
-              </View>
-              <Text style={styles.body}>
-                Worker notes: {booking.workerNotes || 'No worker notes'}
+            ))}
+          </View>
+        </View>
+        <View style={styles.bookingDetailsSection}>
+          <View style={styles.bookingSectionHeading}>
+            <Feather name="check-square" size={16} color={colors.primary} />
+            <Text style={styles.bookingDetailsHeading}>Cleaning checklist</Text>
+          </View>
+          {[
+            ['Exterior wash', 'exteriorWash'],
+            ['Interior cleaning', 'interiorCleaning'],
+            ['Dashboard', 'dashboard'],
+            ['Tyre dressing', 'tyreDressing'],
+            ['Vacuum cleaning', 'vacuumCleaning'],
+          ].map(([title, key]) => {
+            const done =
+              booking.cleaningChecklist?.[
+                key as keyof NonNullable<Booking['cleaningChecklist']>
+              ];
+            return (
+              <DetailRow
+                key={key}
+                title={title}
+                value={done ? 'Done' : 'Pending'}
+              />
+            );
+          })}
+        </View>
+        <View style={styles.bookingDetailsSection}>
+          <View style={styles.bookingSectionHeading}>
+            <Feather name="file-text" size={16} color={colors.primary} />
+            <Text style={styles.bookingDetailsHeading}>Worker notes</Text>
+          </View>
+          <Text style={styles.body}>
+            {booking.workerNotes || 'No worker notes'}
+          </Text>
+        </View>
+        <View style={styles.bookingDetailsSection}>
+          <View style={styles.bookingSectionHeading}>
+            <Feather name="activity" size={16} color={colors.primary} />
+            <Text style={styles.bookingDetailsHeading}>Work timeline</Text>
+          </View>
+          {(booking.workSessions || []).map((session, index) => (
+            <View
+              key={`${session.startedAt}-${index}`}
+              style={styles.timelineEntry}>
+              <Text style={styles.timelineTitle}>
+                {index === 0 ? 'Work started' : 'Work resumed'}
               </Text>
-              <Text style={styles.sectionTitle}>Work timeline</Text>
-              {(booking.workSessions || []).map((session, index) => (
-                <View key={`${session.startedAt}-${index}`} style={styles.timelineEntry}>
-                  <Text style={styles.sectionTitle}>
-                    {index === 0 ? 'Work started' : 'Work resumed'}
+              <Text style={styles.body}>
+                {formatTimelineTime(session.startedAt)}
+              </Text>
+              {session.endedAt ? (
+                <>
+                  <Text style={styles.timelineTitle}>
+                    {booking.workStatus === 'Completed' &&
+                    index === (booking.workSessions?.length || 0) - 1
+                      ? 'Work completed'
+                      : 'Work stopped / paused'}
                   </Text>
                   <Text style={styles.body}>
-                    {formatTimelineTime(session.startedAt)}
+                    {formatTimelineTime(session.endedAt)}
+                    {typeof session.durationSeconds === 'number'
+                      ? ` · Session duration: ${formatWorkDuration(session.durationSeconds)}`
+                      : ''}
                   </Text>
-                  {session.endedAt ? (
-                    <>
-                      <Text style={styles.sectionTitle}>
-                        {booking.workStatus === 'Completed' &&
-                        index === (booking.workSessions?.length || 0) - 1
-                          ? 'Work completed'
-                          : 'Work stopped / paused'}
-                      </Text>
-                      <Text style={styles.body}>
-                        {formatTimelineTime(session.endedAt)}
-                        {typeof session.durationSeconds === 'number'
-                          ? ` · Session duration: ${formatWorkDuration(session.durationSeconds)}`
-                          : ''}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.checklistDone}>Session active</Text>
-                  )}
-                </View>
-              ))}
-              {!booking.workSessions?.length && booking.workCompletedAt ? (
-                <Text style={styles.body}>
-                  Work completed: {formatTimelineTime(booking.workCompletedAt)}
+                </>
+              ) : (
+                <Text style={styles.checklistDone}>Session active</Text>
+              )}
+            </View>
+          ))}
+          {!booking.workSessions?.length && booking.workCompletedAt ? (
+            <Text style={styles.body}>
+              Work completed: {formatTimelineTime(booking.workCompletedAt)}
+            </Text>
+          ) : null}
+          {!booking.workSessions?.length && !booking.workCompletedAt ? (
+            <Text style={styles.body}>No work sessions recorded yet.</Text>
+          ) : null}
+          <DetailRow
+            title="Total working time"
+            value={formatWorkDuration(booking.totalWorkingSeconds)}
+          />
+          {booking.paymentMethod === 'Cash' &&
+          booking.paymentStatus === 'Paid' &&
+          (booking.cashCollectionStatus === 'Received' ||
+            !booking.cashCollectionStatus) ? (
+            <ActionButton
+              title={
+                receiptState.isLoading
+                  ? 'Preparing receipt...'
+                  : 'Download cash receipt PDF'
+              }
+              variant="secondary"
+              onPress={downloadCashReceipt}
+              disabled={receiptState.isLoading}
+            />
+          ) : null}
+        </View>
+        {booking.status === 'Completed' ? (
+          booking.customerRating ? (
+            <View style={styles.bookingDetailsSection}>
+              <View style={styles.bookingSectionHeading}>
+                <Feather name="star" size={16} color={colors.primary} />
+                <Text style={styles.bookingDetailsHeading}>Your review</Text>
+              </View>
+              <Text style={styles.reviewStars}>
+                {'★'.repeat(booking.customerRating)}
+                {'☆'.repeat(5 - booking.customerRating)}
+              </Text>
+              {booking.customerReview ? (
+                <Text style={styles.body}>{booking.customerReview}</Text>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.reviewForm}>
+              <View style={styles.bookingSectionHeading}>
+                <Feather name="star" size={16} color={colors.primary} />
+                <Text style={styles.bookingDetailsHeading}>
+                  Rate this cleaning
                 </Text>
-              ) : null}
-              {booking.paymentMethod === 'Cash' &&
-              booking.paymentStatus === 'Paid' &&
-              (booking.cashCollectionStatus === 'Received' ||
-                !booking.cashCollectionStatus) ? (
-                <ActionButton
-                  title={receiptState.isLoading ? 'Preparing receipt...' : 'Download cash receipt PDF'}
-                  variant="secondary"
-                  onPress={downloadCashReceipt}
-                  disabled={receiptState.isLoading}
-                />
-              ) : null}
-              {!booking.workSessions?.length && !booking.workCompletedAt ? (
-                <Text style={styles.body}>No work sessions recorded yet.</Text>
-              ) : null}
-              <DetailRow
-                title="Total working time"
-                value={formatWorkDuration(booking.totalWorkingSeconds)}
-              />
-              {booking.status === 'Completed' ? (
-                booking.customerRating ? (
-                  <View style={styles.reviewSummary}>
-                    <Text style={styles.sectionTitle}>
-                      Your rating: {'★'.repeat(booking.customerRating)}
-                      {'☆'.repeat(5 - booking.customerRating)}
+              </View>
+              <View style={styles.ratingRow}>
+                {[1, 2, 3, 4, 5].map(value => (
+                  <Pressable
+                    key={value}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${value} stars`}
+                    accessibilityState={{selected: rating === value}}
+                    onPress={() => setRating(value)}>
+                    <Text style={styles.ratingStar}>
+                      {value <= rating ? '★' : '☆'}
                     </Text>
-                    {booking.customerReview ? (
-                      <Text style={styles.body}>{booking.customerReview}</Text>
-                    ) : null}
-                  </View>
-                ) : (
-                  <View style={styles.reviewForm}>
-                    <Text style={styles.sectionTitle}>Rate this cleaning</Text>
-                    <View style={styles.ratingRow}>
-                      {[1, 2, 3, 4, 5].map(value => (
-                        <Pressable
-                          key={value}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${value} stars`}
-                          accessibilityState={{selected: rating === value}}
-                          onPress={() => setRating(value)}>
-                          <Text style={styles.ratingStar}>
-                            {value <= rating ? '★' : '☆'}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <TextField
-                      placeholder="Write a review (optional)"
-                      value={review}
-                      onChangeText={setReview}
-                      multiline
-                      maxLength={1000}
-                    />
-                    {reviewError ? (
-                      <InfoMessage text={reviewError} variant="error" />
-                    ) : null}
-                    <ActionButton
-                      title={reviewState.isLoading ? 'Submitting...' : 'Submit review'}
-                      onPress={saveReview}
-                      disabled={reviewState.isLoading}
-                    />
-                  </View>
-                )
+                  </Pressable>
+                ))}
+              </View>
+              <TextField
+                placeholder="Write a review (optional)"
+                value={review}
+                onChangeText={setReview}
+                multiline
+                maxLength={1000}
+              />
+              {reviewError ? (
+                <InfoMessage text={reviewError} variant="error" />
               ) : null}
               <ActionButton
-                title="Close details"
-                variant="secondary"
-                onPress={() => setDetailsVisible(false)}
+                title={reviewState.isLoading ? 'Submitting...' : 'Submit review'}
+                onPress={saveReview}
+                disabled={reviewState.isLoading}
               />
+            </View>
+          )
+        ) : null}
+        <ActionButton
+          title="Close details"
+          variant="secondary"
+          onPress={() => setDetailsVisible(false)}
+        />
       </DetailsSheet>
       {!['Completed', 'Cancelled', 'InProgress'].includes(booking.status) ? (
         <>
@@ -689,7 +844,22 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
               setVisible={setRescheduling}>
               <View style={styles.rescheduleSheet}>
                 <View style={styles.rescheduleHeader}>
-                  <Text style={styles.modalTitle}>Update booking</Text>
+                  <View style={styles.rescheduleHeaderCopy}>
+                    <View style={styles.rescheduleEyebrow}>
+                      <Feather
+                        name="calendar"
+                        size={13}
+                        color={colors.primary}
+                      />
+                      <Text style={styles.rescheduleEyebrowText}>
+                        RESCHEDULE SERVICE
+                      </Text>
+                    </View>
+                    <Text style={styles.modalTitle}>Update booking</Text>
+                    <Text style={styles.rescheduleSubtitle}>
+                      Choose a new date and available time.
+                    </Text>
+                  </View>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Close reschedule form"
@@ -698,46 +868,174 @@ export const BookingPreview = ({booking}: {booking: Booking}) => {
                     <Feather name="x" size={19} color={colors.ink} />
                   </Pressable>
                 </View>
-                <ScrollView keyboardShouldPersistTaps="handled">
-            <View style={styles.reschedulePanel}>
-              <Pressable
-                onPress={() => setDatePickerVisible(true)}
-                accessibilityRole="button">
-                <TextField
-                  value={rescheduleDate}
-                  editable={false}
-                  pointerEvents="none"
-                  placeholder="Select date"
-                />
-              </Pressable>
-              {slotsQuery.isFetching ? (
-                <LoadingMessage text="Loading available slots..." />
-              ) : slotsQuery.isError ? (
-                <InfoMessage text="Available slots could not be loaded." variant="error" />
-              ) : availableSlots.length ? (
-                <View style={styles.slotList}>
-                  {availableSlots.map((slot: Slot) => (
-                    <ActionButton
-                      key={slot._id}
-                      title={`${slot.startTime} – ${slot.endTime}`}
-                      variant={selectedSlotId === slot._id ? 'primary' : 'secondary'}
-                      onPress={() => setSelectedSlotId(slot._id)}
+                <ScrollView
+                  style={styles.rescheduleScroll}
+                  contentContainerStyle={styles.reschedulePanel}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                  automaticallyAdjustKeyboardInsets
+                  showsVerticalScrollIndicator={false}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      rescheduleDate
+                        ? `Choose date, ${rescheduleDate}`
+                        : 'Choose booking date'
+                    }
+                    onPress={() => setDatePickerVisible(true)}
+                    style={({pressed}) => [
+                      styles.rescheduleDateCard,
+                      pressed && styles.rescheduleDateCardPressed,
+                    ]}>
+                    <View style={styles.rescheduleDateIcon}>
+                      <Feather
+                        name="calendar"
+                        size={19}
+                        color={colors.primary}
+                      />
+                    </View>
+                    <View style={styles.rescheduleDateCopy}>
+                      <Text style={styles.rescheduleDateLabel}>
+                        NEW SERVICE DATE
+                      </Text>
+                      <Text style={styles.rescheduleDateValue}>
+                        {rescheduleDate
+                          ? new Intl.DateTimeFormat('en-IN', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            }).format(new Date(`${rescheduleDate}T00:00:00`))
+                          : 'Select a date'}
+                      </Text>
+                    </View>
+                    <Feather
+                      name="chevron-right"
+                      size={19}
+                      color={colors.muted}
                     />
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.body}>No available slots for this date.</Text>
-              )}
-              {rescheduleError ? (
-                <InfoMessage text={rescheduleError} variant="error" />
-              ) : null}
-              <ActionButton
-                title={updateState.isLoading ? 'Saving...' : 'Save new schedule'}
-                onPress={saveReschedule}
-                disabled={!selectedSlotId || updateState.isLoading || slotsQuery.isFetching}
-              />
-            </View>
+                  </Pressable>
+
+                  <View style={styles.rescheduleSlotsSection}>
+                    <View style={styles.rescheduleSlotsHeading}>
+                      <View style={styles.rescheduleSlotsHeadingCopy}>
+                        <Text style={styles.rescheduleSectionTitle}>
+                          Available time slots
+                        </Text>
+                        <Text style={styles.rescheduleSectionHint}>
+                          {rescheduleDate
+                            ? 'Select one time for your service'
+                            : 'Choose a date to see available times'}
+                        </Text>
+                      </View>
+                      {availableSlots.length > 0 ? (
+                        <View style={styles.rescheduleSlotCount}>
+                          <Text style={styles.rescheduleSlotCountText}>
+                            {availableSlots.length}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    {slotsQuery.isFetching ? (
+                      <View style={styles.rescheduleMessageCard}>
+                        <LoadingMessage text="Finding available times..." />
+                      </View>
+                    ) : slotsQuery.isError ? (
+                      <InfoMessage
+                        text="Available slots could not be loaded. Please try again."
+                        variant="error"
+                      />
+                    ) : availableSlots.length ? (
+                      <View style={styles.slotList}>
+                        {availableSlots.map((slot: Slot) => {
+                          const selected = selectedSlotId === slot._id;
+                          return (
+                            <Pressable
+                              key={slot._id}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${slot.startTime} to ${slot.endTime}`}
+                              accessibilityState={{selected}}
+                              onPress={() => setSelectedSlotId(slot._id)}
+                              style={({pressed}) => [
+                                styles.rescheduleSlot,
+                                selected && styles.rescheduleSlotSelected,
+                                pressed && styles.rescheduleSlotPressed,
+                              ]}>
+                              <View
+                                style={[
+                                  styles.rescheduleSlotIcon,
+                                  selected &&
+                                    styles.rescheduleSlotIconSelected,
+                                ]}>
+                                <Feather
+                                  name="clock"
+                                  size={16}
+                                  color={
+                                    selected ? colors.primary : colors.muted
+                                  }
+                                />
+                              </View>
+                              <View style={styles.rescheduleSlotCopy}>
+                                <Text
+                                  style={[
+                                    styles.rescheduleSlotTime,
+                                    selected &&
+                                      styles.rescheduleSlotTimeSelected,
+                                  ]}>
+                                  {slot.startTime}
+                                </Text>
+                                <Text style={styles.rescheduleSlotEnd}>
+                                  Until {slot.endTime}
+                                </Text>
+                              </View>
+                              <Feather
+                                name={selected ? 'check-circle' : 'circle'}
+                                size={19}
+                                color={
+                                  selected ? colors.primary : colors.border
+                                }
+                              />
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <View style={styles.rescheduleEmpty}>
+                        <View style={styles.rescheduleEmptyIcon}>
+                          <Feather
+                            name="clock"
+                            size={19}
+                            color={colors.muted}
+                          />
+                        </View>
+                        <Text style={styles.rescheduleEmptyTitle}>
+                          No times available
+                        </Text>
+                        <Text style={styles.rescheduleEmptyText}>
+                          Try another date to find an open service slot.
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  {rescheduleError ? (
+                    <InfoMessage text={rescheduleError} variant="error" />
+                  ) : null}
                 </ScrollView>
+                <View style={styles.rescheduleFooter}>
+                  <ActionButton
+                    title={
+                      updateState.isLoading
+                        ? 'Saving...'
+                        : 'Save new schedule'
+                    }
+                    onPress={saveReschedule}
+                    disabled={
+                      !selectedSlotId ||
+                      updateState.isLoading ||
+                      slotsQuery.isFetching
+                    }
+                  />
+                </View>
               </View>
             </BottomSheet>
           ) : null}
@@ -898,53 +1196,193 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.paleBlue,
   },
-  row: {flexDirection: 'row', justifyContent: 'space-between', gap: 8},
-  bookingPreview: {gap: 6, borderRadius: 14, paddingVertical: 11},
-  bookingSummary: {gap: 6},
+  bookingPreview: {
+    gap: 0,
+    overflow: 'hidden',
+    padding: 0,
+    borderRadius: 19,
+    borderColor: '#DCE8ED',
+  },
+  bookingSummary: {gap: 12, padding: 14},
+  bookingCardHeader: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  bookingServiceIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.paleBlue,
+  },
+  bookingServiceCopy: {flex: 1, minWidth: 0, gap: 4},
+  bookingCar: {fontSize: 11, color: colors.muted},
+  statusBadge: {
+    maxWidth: 100,
+    flexShrink: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 11,
+  },
+  statusBadgeComplete: {backgroundColor: '#E8F5EE'},
+  statusBadgeCancelled: {backgroundColor: '#FDECEA'},
+  statusBadgeActive: {backgroundColor: '#EAF0FF'},
+  statusBadgeUpcoming: {backgroundColor: colors.paleBlue},
+  statusBadgeText: {fontSize: 10, fontWeight: '800', textAlign: 'center'},
+  statusTextComplete: {color: colors.success},
+  statusTextCancelled: {color: colors.danger},
+  statusTextActive: {color: '#526BC4'},
+  statusTextUpcoming: {color: colors.primaryDark},
+  bookingMetaRow: {flexDirection: 'row', alignItems: 'center', gap: 9},
+  bookingMetaIcon: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: '#F1F6F7',
+  },
+  bookingMetaCopy: {flex: 1, minWidth: 0, gap: 2},
+  bookingMetaLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    color: colors.muted,
+  },
+  bookingMetaValue: {fontSize: 12, fontWeight: '600', color: colors.ink},
+  bookingCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: '#FBFCFD',
+  },
+  bookingAmountGroup: {flex: 1, minWidth: 0, gap: 2},
+  bookingAmount: {fontSize: 15, fontWeight: '900', color: colors.primaryDark},
+  bookingPaymentStatus: {fontSize: 10, fontWeight: '600', color: colors.muted},
   manageLink: {
-    minHeight: 40,
+    minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-    paddingTop: 6,
+    paddingHorizontal: 14,
+    backgroundColor: '#FBFCFD',
   },
   manageLinkText: {fontSize: 12, fontWeight: '700', color: colors.primary},
   cardTitle: {fontSize: 15, fontWeight: '700', color: colors.ink, flex: 1},
-  status: {fontSize: 12, fontWeight: '700', color: colors.primary},
-  bookingSummaryMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  summaryAmount: {flex: 1, minWidth: 0},
   bookingWorkStatus: {
     flexShrink: 1,
     textAlign: 'right',
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.ink,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#F1F6F7',
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.primaryDark,
   },
   emptyTitle: {fontSize: 15, fontWeight: '700', color: colors.ink},
   emptyAction: {flexDirection: 'row', alignItems: 'center', gap: 7},
   emptyActionText: {fontSize: 13, fontWeight: '800', color: colors.primary},
   body: {fontSize: 13, lineHeight: 19, color: colors.muted},
-  reschedulePanel: {gap: 10, padding: 16, paddingBottom: 26},
+  reschedulePanel: {
+    gap: 20,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 18,
+  },
+  rescheduleScroll: {flexShrink: 1},
   rescheduleSheet: {
     maxHeight: '90%',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     backgroundColor: colors.white,
-    paddingTop: 8,
+    paddingTop: 12,
   },
   rescheduleHeader: {
-    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingBottom: 15,
+  },
+  rescheduleHeaderCopy: {flex: 1, gap: 4},
+  rescheduleEyebrow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  rescheduleEyebrowText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: colors.primary,
+  },
+  rescheduleSubtitle: {fontSize: 12, lineHeight: 17, color: colors.muted},
+  rescheduleDateCard: {
+    minHeight: 76,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#D5E9E9',
+    borderRadius: 16,
+    backgroundColor: '#F3FAFA',
+  },
+  rescheduleDateCardPressed: {opacity: 0.8},
+  rescheduleDateIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.white,
+  },
+  rescheduleDateCopy: {flex: 1, gap: 5},
+  rescheduleDateLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    color: colors.muted,
+  },
+  rescheduleDateValue: {fontSize: 14, fontWeight: '800', color: colors.ink},
+  rescheduleSlotsSection: {gap: 12},
+  rescheduleSlotsHeading: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
+    gap: 10,
+  },
+  rescheduleSlotsHeadingCopy: {flex: 1, gap: 4},
+  rescheduleSectionTitle: {fontSize: 15, fontWeight: '800', color: colors.ink},
+  rescheduleSectionHint: {fontSize: 11, lineHeight: 16, color: colors.muted},
+  rescheduleSlotCount: {
+    minWidth: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 7,
+    borderRadius: 14,
+    backgroundColor: '#E8F4F4',
+  },
+  rescheduleSlotCountText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.primaryDark,
+  },
+  rescheduleMessageCard: {
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
   },
   closeButton: {
     width: 34,
@@ -954,7 +1392,70 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     backgroundColor: colors.canvas,
   },
-  slotList: {gap: 8},
+  slotList: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
+  rescheduleSlot: {
+    width: '48%',
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+  },
+  rescheduleSlotSelected: {
+    borderColor: colors.primary,
+    backgroundColor: '#F0F9F8',
+  },
+  rescheduleSlotPressed: {opacity: 0.8},
+  rescheduleSlotIcon: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+  },
+  rescheduleSlotIconSelected: {backgroundColor: '#DFF1EF'},
+  rescheduleSlotCopy: {flex: 1, minWidth: 0, gap: 3},
+  rescheduleSlotTime: {fontSize: 12, fontWeight: '800', color: colors.ink},
+  rescheduleSlotTimeSelected: {color: colors.primaryDark},
+  rescheduleSlotEnd: {fontSize: 9, color: colors.muted},
+  rescheduleEmpty: {
+    alignItems: 'center',
+    gap: 6,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+  },
+  rescheduleEmptyIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+  },
+  rescheduleEmptyTitle: {fontSize: 13, fontWeight: '800', color: colors.ink},
+  rescheduleEmptyText: {
+    textAlign: 'center',
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.muted,
+  },
+  rescheduleFooter: {
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.white,
+  },
   photoRow: {flexDirection: 'row', gap: 10},
   carImage: {width: '100%', height: 150, borderRadius: 10, backgroundColor: colors.canvas, marginBottom: 8},
   photoItem: {flex: 1, gap: 4},
@@ -969,30 +1470,109 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
   },
-  checklist: {gap: 5},
-  checklistRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   checklistDone: {fontSize: 13, fontWeight: '700', color: colors.success},
-  checklistPending: {fontSize: 13, color: colors.muted},
   ratingRow: {flexDirection: 'row', gap: 6},
   ratingStar: {fontSize: 28, color: colors.primary},
-  reviewForm: {gap: 8},
-  reviewSummary: {gap: 5},
+  reviewForm: {
+    gap: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#DCE8ED',
+    borderRadius: 18,
+    backgroundColor: '#F8FAFC',
+  },
+  reviewStars: {fontSize: 24, letterSpacing: 2, color: colors.primary},
   modalTitle: {fontSize: 18, fontWeight: '800', color: colors.ink},
-  detailRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
+  detailRow: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E1E9EE',
+  },
   detailLabel: {flex: 1, fontSize: 12, color: colors.muted},
-  detailValue: {flex: 1, textAlign: 'right', fontSize: 12, color: colors.ink, fontWeight: '600'},
-  bookingDetailsSection: {gap: 7, paddingVertical: 8},
+  detailValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 12,
+    color: colors.ink,
+    fontWeight: '700',
+  },
+  bookingDetailHero: {
+    gap: 13,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#D5E9E9',
+    borderRadius: 18,
+    backgroundColor: '#F3FAFA',
+  },
+  bookingDetailHeroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  bookingDetailHeroIcon: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: colors.white,
+  },
+  bookingDetailHeroCopy: {flex: 1, minWidth: 0, gap: 4},
+  bookingDetailHeroTitle: {fontSize: 15, fontWeight: '900', color: colors.ink},
+  bookingDetailDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#D5E2E5',
+  },
+  bookingDetailHeroFooter: {flexDirection: 'row', gap: 12},
+  bookingHeroMetric: {flex: 1, minWidth: 0, gap: 4},
+  timezoneHint: {flexDirection: 'row', alignItems: 'center', gap: 6},
+  timezoneText: {fontSize: 10, color: colors.muted},
+  bookingDetailsSection: {
+    gap: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2EAF0',
+    borderRadius: 18,
+    backgroundColor: '#F8FAFC',
+    shadowColor: '#16324A',
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  bookingSectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingBottom: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#DDE6EC',
+  },
   bookingDetailsHeading: {fontSize: 14, fontWeight: '800', color: colors.ink},
-  vehicleDetailImage: {width: '100%', height: 150, borderRadius: 12, backgroundColor: colors.canvas},
+  vehicleDetailImage: {
+    width: '100%',
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: colors.canvas,
+  },
   workerIdentity: {flexDirection: 'row', alignItems: 'center', gap: 10},
   workerAvatar: {width: 46, height: 46, borderRadius: 23, backgroundColor: colors.canvas},
   workerAvatarPlaceholder: {alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paleBlue},
   workerName: {fontSize: 14, fontWeight: '700', color: colors.ink},
-  timelineEntry: {borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 10, gap: 2},
+  timelineEntry: {
+    gap: 5,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: '#E1E9EE',
+    borderRadius: 13,
+    backgroundColor: colors.white,
+  },
+  timelineTitle: {fontSize: 12, fontWeight: '800', color: colors.ink},
   datePicker: {backgroundColor: colors.white, padding: 18, borderRadius: 16, gap: 12},
 });
 

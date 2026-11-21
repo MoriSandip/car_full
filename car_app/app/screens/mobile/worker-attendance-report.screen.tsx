@@ -7,10 +7,9 @@ import {
   colors,
   DetailsSheet,
   InfoMessage,
-  LoadingMessage,
+  LoadingSkeleton,
   ListItemPressable,
   Page,
-  PageTitle,
 } from '../../components/mobile/ui';
 import {useGetMyAttendanceHistoryQuery} from '../../store/worker.api';
 import {WorkerAttendance} from '../../store/types';
@@ -39,6 +38,55 @@ const WorkerAttendanceReportScreen = () => {
 
   return (
     <Page
+      listData={isLoading || isError ? [] : report?.records ?? []}
+      listKeyExtractor={record => record._id}
+      renderListItem={({item: record}) => (
+        <ListItemPressable
+          accessibilityLabel={`View attendance for ${formatDate(record.dateKey)}`}
+          onPress={() => setSelectedRecord(record)}>
+          <Card style={styles.recordCard}>
+            <View style={styles.header}>
+              <View style={styles.recordDate}>
+                <View style={styles.dateIcon}>
+                  <Feather name="calendar" size={16} color={colors.primary} />
+                </View>
+                <Text style={styles.heading}>{formatDate(record.dateKey)}</Text>
+              </View>
+              <Text
+                style={[
+                  styles.badge,
+                  record.punchOutAt ? styles.complete : styles.inProgress,
+                ]}>
+                {record.punchOutAt ? 'Complete' : 'In progress'}
+              </Text>
+            </View>
+            <View style={styles.row}>
+              <View style={styles.timeValue}>
+                <Text style={styles.label}>In</Text>
+                <Text style={styles.time}>{formatTime(record.punchInAt)}</Text>
+              </View>
+              <View style={styles.timeValue}>
+                <Text style={styles.label}>Out</Text>
+                <Text style={styles.time}>{formatTime(record.punchOutAt)}</Text>
+              </View>
+            </View>
+            <View style={styles.itemFooter}>
+              <Text style={styles.itemFooterText}>View full details</Text>
+              <Feather name="chevron-right" size={16} color={colors.primary} />
+            </View>
+          </Card>
+        </ListItemPressable>
+      )}
+      listFooter={
+        report && report.meta.total > report.records.length ? (
+          <ActionButton
+            title={isFetching ? 'Loading...' : 'Load older attendance'}
+            onPress={() => setLimit(current => current + 10)}
+            disabled={isFetching}
+            variant="secondary"
+          />
+        ) : null
+      }
       refreshControl={
         <RefreshControl
           refreshing={isFetching}
@@ -48,71 +96,14 @@ const WorkerAttendanceReportScreen = () => {
           tintColor={colors.primary}
         />
       }>
-      <PageTitle compact
-        title="My attendance report"
-        subtitle="Review your daily punch-in and punch-out history."
-      />
       {isLoading ? (
-        <LoadingMessage text="Loading attendance report..." />
+        <LoadingSkeleton rows={3} />
       ) : isError ? (
         <InfoMessage
           text="Could not load your attendance report."
           variant="error"
         />
-      ) : report?.records.length ? (
-        <>
-          {report.records.map(record => (
-            <ListItemPressable
-              key={record._id}
-              accessibilityLabel={`View attendance for ${formatDate(record.dateKey)}`}
-              onPress={() => setSelectedRecord(record)}>
-            <Card style={styles.recordCard}>
-              <View style={styles.header}>
-                <View style={styles.recordDate}>
-                  <View style={styles.dateIcon}>
-                    <Feather
-                      name="calendar"
-                      size={16}
-                      color={colors.primary}
-                    />
-                  </View>
-                  <Text style={styles.heading}>{formatDate(record.dateKey)}</Text>
-                </View>
-                <Text
-                  style={[
-                    styles.badge,
-                    record.punchOutAt ? styles.complete : styles.inProgress,
-                  ]}>
-                  {record.punchOutAt ? 'Complete' : 'In progress'}
-                </Text>
-              </View>
-              <View style={styles.row}>
-                <View style={styles.timeValue}>
-                  <Text style={styles.label}>In</Text>
-                  <Text style={styles.time}>{formatTime(record.punchInAt)}</Text>
-                </View>
-                <View style={styles.timeValue}>
-                  <Text style={styles.label}>Out</Text>
-                  <Text style={styles.time}>{formatTime(record.punchOutAt)}</Text>
-                </View>
-              </View>
-              <View style={styles.itemFooter}>
-                <Text style={styles.itemFooterText}>View full details</Text>
-                <Feather name="chevron-right" size={16} color={colors.primary} />
-              </View>
-            </Card>
-            </ListItemPressable>
-          ))}
-          {report.meta.total > report.records.length ? (
-            <ActionButton
-              title={isFetching ? 'Loading...' : 'Load older attendance'}
-              onPress={() => setLimit(current => current + 10)}
-              disabled={isFetching}
-              variant="secondary"
-            />
-          ) : null}
-        </>
-      ) : (
+      ) : report?.records.length ? null : (
         <Card style={styles.emptyCard}>
           <View style={styles.emptyIcon}>
             <Feather name="clock" size={19} color={colors.primary} />

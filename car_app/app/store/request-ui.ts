@@ -8,6 +8,13 @@ export type ApiConfirmation = {
 type RequestUiSnapshot = {
   activeRequests: number;
   confirmation: ApiConfirmation | null;
+  outcome: ApiOutcome | null;
+};
+
+export type ApiOutcome = {
+  success: boolean;
+  title: string;
+  message: string;
 };
 
 type PendingConfirmation = {
@@ -21,6 +28,7 @@ let nextConfirmationId = 1;
 let snapshot: RequestUiSnapshot = {
   activeRequests: 0,
   confirmation: null,
+  outcome: null,
 };
 
 const publish = () => {
@@ -39,16 +47,24 @@ export const subscribeToRequestUi = (listener: () => void) => {
 export const getRequestUiSnapshot = () => snapshot;
 
 export const beginApiRequest = () => {
-  snapshot = {...snapshot, activeRequests: snapshot.activeRequests + 1};
+  snapshot = {
+    ...snapshot,
+    activeRequests: snapshot.activeRequests + 1,
+    outcome: null,
+  };
   listeners.forEach(listener => listener());
 
   let finished = false;
-  return () => {
+  return (outcome?: ApiOutcome) => {
     if (finished) return;
     finished = true;
     snapshot = {
       ...snapshot,
       activeRequests: Math.max(0, snapshot.activeRequests - 1),
+      outcome:
+        outcome && snapshot.activeRequests <= 1
+          ? outcome
+          : snapshot.outcome,
     };
     listeners.forEach(listener => listener());
   };
@@ -56,6 +72,7 @@ export const beginApiRequest = () => {
 
 export const requestApiConfirmation = (endpoint: string): Promise<boolean> =>
   new Promise(resolve => {
+    snapshot = {...snapshot, outcome: null};
     const actionLabel = endpoint
       .replace(/Mutation$/, '')
       .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -92,4 +109,10 @@ export const resolveApiConfirmation = (confirmed: boolean) => {
   if (!pending) return;
   pending.resolve(confirmed);
   publish();
+};
+
+export const dismissApiOutcome = () => {
+  if (!snapshot.outcome) return;
+  snapshot = {...snapshot, outcome: null};
+  listeners.forEach(listener => listener());
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -26,11 +26,12 @@ import {
   Card,
   colors,
   DetailsSheet,
+  FilterBottomSheet,
   InfoMessage,
-  LoadingMessage,
+  LoadingSkeleton,
   ListItemPressable,
   Page,
-  PageTitle,
+  SearchFilterBar,
   TextField,
 } from '../../components/mobile/ui';
 import {
@@ -59,6 +60,31 @@ import { BottomSheet } from '../../components/bottomSheet/BottomSheet';
 type Section = 'society' | 'flat' | 'car';
 type AssetRouteName = 'CustomerSociety' | 'CustomerFlat' | 'CustomerCar';
 type Props = StackScreenProps<NavigatorParamList, AssetRouteName>;
+type AssetListItem =
+  | { type: 'society'; value: Society }
+  | { type: 'flat'; value: Flat }
+  | { type: 'car'; value: Car };
+const emptySocieties: Society[] = [];
+const emptyFlats: Flat[] = [];
+const emptyCars: Car[] = [];
+const verificationOptions = [
+  { label: 'All verification statuses', value: 'All' },
+  { label: 'Pending', value: 'PENDING' },
+  { label: 'Verified', value: 'VERIFIED' },
+  { label: 'Rejected', value: 'REJECTED' },
+];
+const flatStatusOptions = [
+  { label: 'All occupancy statuses', value: 'All' },
+  { label: 'Available', value: 'Available' },
+  { label: 'Occupied', value: 'Occupied' },
+  { label: 'Maintenance', value: 'Maintenance' },
+];
+const carStatusOptions = [
+  { label: 'All vehicle statuses', value: 'All' },
+  { label: 'Active', value: 'Active' },
+  { label: 'Inactive', value: 'Inactive' },
+  { label: 'Maintenance', value: 'Maintenance' },
+];
 
 const errorText = (error: unknown) => {
   const value = error as { data?: { message?: string }; message?: string };
@@ -129,6 +155,12 @@ const CustomerAssetsScreen = ({ route }: Props) => {
   const [editingCar, setEditingCar] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [verificationFilter, setVerificationFilter] = useState('All');
+  const [assetStatusFilter, setAssetStatusFilter] = useState('All');
+  const [draftVerificationFilter, setDraftVerificationFilter] = useState('All');
+  const [draftAssetStatusFilter, setDraftAssetStatusFilter] = useState('All');
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [search, setSearch] = useState('');
 
   const currentUser = useAppSelector(state => state.auth.user);
   const societyQuery = useGetMySocietiesQuery();
@@ -139,9 +171,9 @@ const CustomerAssetsScreen = ({ route }: Props) => {
   const profileQuery = useGetCustomerProfileQuery(undefined, {
     skip: section !== 'car',
   });
-  const societies = societyQuery.data?.data ?? [];
-  const flats = flatQuery.data?.data ?? [];
-  const cars = carQuery.data?.data ?? [];
+  const societies = societyQuery.data?.data ?? emptySocieties;
+  const flats = flatQuery.data?.data ?? emptyFlats;
+  const cars = carQuery.data?.data ?? emptyCars;
   const approvedSocieties = societies.filter(
     item => item.status === 'VERIFIED',
   );
@@ -164,6 +196,7 @@ const CustomerAssetsScreen = ({ route }: Props) => {
     (section === 'car' && (carQuery.isLoading || profileQuery.isLoading));
 
   const submitSociety = async () => {
+    console.log('Submitting society:', societyForm);
     setError('');
     setNotice('');
     if (
@@ -175,18 +208,21 @@ const CustomerAssetsScreen = ({ route }: Props) => {
       return;
     }
     try {
+      console.log('Creating society ........',)
       await createSociety({
         ...societyForm,
         name: societyForm.name.trim(),
         address: societyForm.address.trim(),
         city: societyForm.city.trim(),
       }).unwrap();
+      console.log('Society created successfully////////');
       setSocietyForm(societyDefaults);
       setNotice(
         'Society submitted. It will be available after admin verification.',
       );
       setFormVisible(false);
     } catch (requestError) {
+      console.error('Error submitting society:', requestError);
       setError(errorText(requestError));
     }
   };
@@ -452,9 +488,149 @@ const CustomerAssetsScreen = ({ route }: Props) => {
     setCarImagePreview('');
     setFormVisible(true);
   };
+  const assetList = useMemo<AssetListItem[]>(() => {
+    if (section === 'society') {
+      return societies.map(value => ({ type: 'society', value }));
+    }
+    if (section === 'flat') {
+      return flats.map(value => ({ type: 'flat', value }));
+    }
+    return cars.map(value => ({ type: 'car', value }));
+  }, [cars, flats, section, societies]);
+  const visibleAssetList = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return assetList.filter(item => {
+      if (item.type === 'society') {
+        const matchesStatus =
+          verificationFilter === 'All' ||
+          item.value.status === verificationFilter;
+        if (!matchesStatus) return false;
+        if (!term) return true;
+        return [
+          item.value.name,
+          item.value.address,
+          item.value.city,
+          item.value.state,
+          item.value.pincode,
+          item.value.status,
+          item.value.contactPerson,
+          item.value.phone,
+          item.value.email,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(term);
+      }
+      if (
+        verificationFilter !== 'All' &&
+        item.value.verificationStatus !== verificationFilter
+      ) {
+        return false;
+      }
+      if (
+        assetStatusFilter !== 'All' &&
+        item.value.status !== assetStatusFilter
+      ) {
+        return false;
+      }
+      if (!term) return true;
+      const searchableText =
+        item.type === 'flat'
+          ? [
+              item.value.flatNumber,
+              item.value.block,
+              item.value.flatType,
+              item.value.floorNumber,
+              item.value.area,
+              item.value.status,
+              item.value.verificationStatus,
+              label(item.value.societyId),
+            ]
+          : [
+              item.value.registrationNumber,
+              item.value.make,
+              item.value.model,
+              item.value.color,
+              item.value.carType,
+              item.value.parkingSlot,
+              item.value.status,
+              item.value.verificationStatus,
+              label(item.value.societyId),
+              label(item.value.flatId),
+            ];
+      return searchableText
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(term);
+    });
+  }, [assetList, assetStatusFilter, search, verificationFilter]);
+  const verificationLabel =
+    verificationOptions.find(option => option.value === verificationFilter)
+      ?.label ?? verificationFilter;
+  const assetStatusOptions =
+    section === 'flat' ? flatStatusOptions : carStatusOptions;
+  const assetStatusLabel =
+    assetStatusOptions.find(option => option.value === assetStatusFilter)
+      ?.label ?? assetStatusFilter;
+  const headingTitle =
+    section === 'society'
+      ? 'Registered societies'
+      : section === 'flat'
+      ? 'Registered flats'
+      : 'Registered cars';
+  const emptyTitle =
+    section === 'society'
+      ? 'No society registered'
+      : section === 'flat'
+      ? 'No flats registered'
+      : 'No cars registered';
+  const emptyDescription =
+    section === 'society'
+      ? 'Add your society first. Once verified, you can register flats and cars.'
+      : section === 'flat'
+      ? 'Register a flat in one of your verified societies to continue.'
+      : 'Add your car details to make it available for wash bookings.';
+  const hasLoadError =
+    societyQuery.isError ||
+    (section !== 'society' && flatQuery.isError) ||
+    (section === 'car' && (carQuery.isError || profileQuery.isError));
 
   return (
     <Page
+      listData={isLoading || hasLoadError ? [] : visibleAssetList}
+      listKeyExtractor={item => item.value._id}
+      renderListItem={({ item }) => {
+        if (item.type === 'society') {
+          return (
+            <SocietyCard
+              society={item.value}
+              onPress={() => setSelectedSociety(item.value)}
+            />
+          );
+        }
+        if (item.type === 'flat') {
+          return (
+            <FlatCard
+              flat={item.value}
+              onPress={() => setSelectedFlat(item.value)}
+              onEdit={() => startFlatEdit(item.value)}
+              onDelete={() => removeFlat(item.value)}
+              busy={flatDeleteMutation.isLoading}
+            />
+          );
+        }
+        return (
+          <CarCard
+            car={item.value}
+            onPress={() => setSelectedCar(item.value)}
+            onEdit={() => startCarEdit(item.value)}
+            onDelete={() => removeCar(item.value)}
+            busy={carDeleteMutation.isLoading}
+          />
+        );
+      }}
       headerAction={
         <Pressable
           accessibilityRole="button"
@@ -466,26 +642,7 @@ const CustomerAssetsScreen = ({ route }: Props) => {
         </Pressable>
       }
     >
-      <PageTitle
-        compact
-        title={
-          section === 'society'
-            ? 'My society'
-            : section === 'flat'
-            ? 'My flats'
-            : 'My cars'
-        }
-        subtitle={
-          section === 'society'
-            ? 'Register your residential society and track its verification.'
-            : section === 'flat'
-            ? 'Add and manage the flats linked to your verified society.'
-            : 'Register your vehicles and keep their details up to date.'
-        }
-      />
-      {isLoading ? (
-        <LoadingMessage text="Loading your registrations..." />
-      ) : null}
+      {isLoading ? <LoadingSkeleton rows={3} /> : null}
       {societyQuery.isError ||
       (section !== 'society' && flatQuery.isError) ||
       (section === 'car' && (carQuery.isError || profileQuery.isError)) ? (
@@ -514,83 +671,179 @@ const CustomerAssetsScreen = ({ route }: Props) => {
       {!formVisible && notice ? (
         <InfoMessage text={notice} variant="success" />
       ) : null}
+      <ListHeading title={headingTitle} count={visibleAssetList.length} />
+      <SearchFilterBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder={
+          section === 'society'
+            ? 'Search societies'
+            : section === 'flat'
+            ? 'Search flats'
+            : 'Search cars'
+        }
+        filterAccessibilityLabel={`Filter ${section} records`}
+        hasActiveFilters={
+          verificationFilter !== 'All' ||
+          (section !== 'society' && assetStatusFilter !== 'All')
+        }
+        onFilterPress={() => {
+          setDraftVerificationFilter(verificationFilter);
+          setDraftAssetStatusFilter(assetStatusFilter);
+          setFilterVisible(true);
+        }}
+      />
+      <View style={styles.activeFilters}>
+        <Text style={styles.activeFilterLabel}>Showing</Text>
+        <View style={styles.activeFilterChip}>
+          <Text style={styles.activeFilterText}>
+            {section === 'society'
+              ? verificationLabel
+              : verificationFilter === 'All' && assetStatusFilter === 'All'
+              ? 'All statuses'
+              : [
+                  verificationFilter !== 'All' ? verificationLabel : null,
+                  assetStatusFilter !== 'All' ? assetStatusLabel : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+          </Text>
+        </View>
+      </View>
+      <FilterBottomSheet
+        visible={filterVisible}
+        setVisible={setFilterVisible}
+        title={`Filter ${section} records`}
+        subtitle="Choose which registration statuses to show"
+        groups={[
+          {
+            key: 'verification',
+            title:
+              section === 'society' ? 'Approval status' : 'Verification status',
+            value: draftVerificationFilter,
+            defaultValue: 'All',
+            options: verificationOptions,
+            onChange: setDraftVerificationFilter,
+          },
+          ...(section === 'society'
+            ? []
+            : [
+                {
+                  key: 'assetStatus',
+                  title:
+                    section === 'flat' ? 'Occupancy status' : 'Vehicle status',
+                  value: draftAssetStatusFilter,
+                  defaultValue: 'All',
+                  options: assetStatusOptions,
+                  onChange: setDraftAssetStatusFilter,
+                },
+              ]),
+        ]}
+        onApply={() => {
+          setVerificationFilter(draftVerificationFilter);
+          setAssetStatusFilter(
+            section === 'society' ? 'All' : draftAssetStatusFilter,
+          );
+        }}
+      />
+      {!isLoading && !hasLoadError && !visibleAssetList.length ? (
+        <EmptyRegistration
+          icon={
+            section === 'society'
+              ? 'home'
+              : section === 'flat'
+              ? 'grid'
+              : 'truck'
+          }
+          title={assetList.length ? 'No matching records' : emptyTitle}
+          description={
+            assetList.length
+              ? 'Try another search or filter to see more records.'
+              : emptyDescription
+          }
+        />
+      ) : null}
 
       {section === 'society' ? (
         <>
-          <ListHeading title="Registered societies" count={societies.length} />
-          <View style={styles.list}>
-            {societies.length ? (
-              societies.map(society => (
-                <SocietyCard
-                  key={society._id}
-                  society={society}
-                  onPress={() => setSelectedSociety(society)}
-                />
-              ))
-            ) : (
-              <EmptyRegistration
-                icon="home"
-                title="No society registered"
-                description="Add your society first. Once verified, you can register flats and cars."
-              />
-            )}
-          </View>
           <FormSheet
             visible={formVisible}
             title="Register a society"
+            subtitle="Add community and contact information for verification."
+            icon="home"
             onClose={() => setFormVisible(false)}
           >
             {error ? <InfoMessage text={error} variant="error" /> : null}
-            <TextField
-              placeholder="Society name *"
-              value={societyForm.name}
-              onChangeText={name => setSocietyForm({ ...societyForm, name })}
-            />
-            <TextField
-              placeholder="Address *"
-              value={societyForm.address}
-              onChangeText={address =>
-                setSocietyForm({ ...societyForm, address })
-              }
-            />
-            <TextField
-              placeholder="City *"
-              value={societyForm.city}
-              onChangeText={city => setSocietyForm({ ...societyForm, city })}
-            />
-            <TextField
-              placeholder="State"
-              value={societyForm.state}
-              onChangeText={state => setSocietyForm({ ...societyForm, state })}
-            />
-            <TextField
-              placeholder="Pincode"
-              value={societyForm.pincode}
-              onChangeText={pincode =>
-                setSocietyForm({ ...societyForm, pincode })
-              }
-              keyboardType="number-pad"
-            />
-            <TextField
-              placeholder="Contact person"
-              value={societyForm.contactPerson}
-              onChangeText={contactPerson =>
-                setSocietyForm({ ...societyForm, contactPerson })
-              }
-            />
-            <TextField
-              placeholder="Contact phone"
-              value={societyForm.phone}
-              onChangeText={phone => setSocietyForm({ ...societyForm, phone })}
-              keyboardType="phone-pad"
-            />
-            <TextField
-              placeholder="Contact email"
-              value={societyForm.email}
-              onChangeText={email => setSocietyForm({ ...societyForm, email })}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+            <Card style={styles.formSection}>
+              <FormSectionHeader
+                icon="home"
+                title="Community details"
+                subtitle="Basic location information"
+              />
+              <TextField
+                placeholder="Society name *"
+                value={societyForm.name}
+                onChangeText={name => setSocietyForm({ ...societyForm, name })}
+              />
+              <TextField
+                placeholder="Address *"
+                value={societyForm.address}
+                onChangeText={address =>
+                  setSocietyForm({ ...societyForm, address })
+                }
+              />
+              <TextField
+                placeholder="City *"
+                value={societyForm.city}
+                onChangeText={city => setSocietyForm({ ...societyForm, city })}
+              />
+              <TextField
+                placeholder="State"
+                value={societyForm.state}
+                onChangeText={state =>
+                  setSocietyForm({ ...societyForm, state })
+                }
+              />
+              <TextField
+                placeholder="Pincode"
+                value={societyForm.pincode}
+                onChangeText={pincode =>
+                  setSocietyForm({ ...societyForm, pincode })
+                }
+                keyboardType="number-pad"
+              />
+            </Card>
+            <Card style={styles.formSection}>
+              <FormSectionHeader
+                icon="phone"
+                title="Contact details"
+                subtitle="Optional point of contact for verification"
+              />
+              <TextField
+                placeholder="Contact person"
+                value={societyForm.contactPerson}
+                onChangeText={contactPerson =>
+                  setSocietyForm({ ...societyForm, contactPerson })
+                }
+              />
+              <TextField
+                placeholder="Contact phone"
+                value={societyForm.phone}
+                onChangeText={phone =>
+                  setSocietyForm({ ...societyForm, phone })
+                }
+                keyboardType="phone-pad"
+              />
+              <TextField
+                placeholder="Contact email"
+                value={societyForm.email}
+                onChangeText={email =>
+                  setSocietyForm({ ...societyForm, email })
+                }
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </Card>
             <ActionButton
               title={
                 societyMutation.isLoading ? 'Submitting...' : 'Submit society'
@@ -604,85 +857,84 @@ const CustomerAssetsScreen = ({ route }: Props) => {
 
       {section === 'flat' ? (
         <>
-          <ListHeading title="Registered flats" count={flats.length} />
-          <View style={styles.list}>
-            {flats.length ? (
-              flats.map(flat => (
-                <FlatCard
-                  key={flat._id}
-                  flat={flat}
-                  onPress={() => setSelectedFlat(flat)}
-                  onEdit={() => startFlatEdit(flat)}
-                  onDelete={() => removeFlat(flat)}
-                  busy={flatDeleteMutation.isLoading}
-                />
-              ))
-            ) : (
-              <EmptyRegistration
-                icon="grid"
-                title="No flats registered"
-                description="Register a flat in one of your verified societies to continue."
-              />
-            )}
-          </View>
           <FormSheet
             visible={formVisible}
             title={editingFlat ? 'Edit flat' : 'Register a flat'}
+            subtitle="Connect the flat to a verified society and add its details."
+            icon="grid"
             onClose={() => setFormVisible(false)}
           >
             {error ? <InfoMessage text={error} variant="error" /> : null}
-            {approvedSocieties.length ? (
-              <ChoiceList
-                title="Choose a verified society"
-                items={approvedSocieties.map(item => ({
-                  id: item._id,
-                  label: item.name,
-                }))}
-                selected={flatForm.societyId}
-                onSelect={societyId => setFlatForm({ ...flatForm, societyId })}
+            <Card style={styles.formSection}>
+              <FormSectionHeader
+                icon="home"
+                title="Society"
+                subtitle="Choose the community where the flat is located"
               />
-            ) : (
-              <InfoMessage text="A society submitted by you must be verified by admin before you can register its flat." />
-            )}
-            <TextField
-              placeholder="Flat number *"
-              value={flatForm.flatNumber}
-              onChangeText={flatNumber =>
-                setFlatForm({ ...flatForm, flatNumber })
-              }
-            />
-            <TextField
-              placeholder="Block"
-              value={flatForm.block}
-              onChangeText={block => setFlatForm({ ...flatForm, block })}
-            />
-            <TextField
-              placeholder="Floor number"
-              value={flatForm.floorNumber?.toString() ?? ''}
-              onChangeText={value =>
-                setFlatForm({
-                  ...flatForm,
-                  floorNumber: value ? Number(value) : undefined,
-                })
-              }
-              keyboardType="number-pad"
-            />
-            <TextField
-              placeholder="Flat type (e.g. 2BHK) *"
-              value={flatForm.flatType}
-              onChangeText={flatType => setFlatForm({ ...flatForm, flatType })}
-            />
-            <TextField
-              placeholder="Area (sq. ft.)"
-              value={flatForm.area?.toString() ?? ''}
-              onChangeText={value =>
-                setFlatForm({
-                  ...flatForm,
-                  area: value ? Number(value) : undefined,
-                })
-              }
-              keyboardType="decimal-pad"
-            />
+              {approvedSocieties.length ? (
+                <ChoiceList
+                  title="Choose a verified society"
+                  items={approvedSocieties.map(item => ({
+                    id: item._id,
+                    label: item.name,
+                  }))}
+                  selected={flatForm.societyId}
+                  onSelect={societyId =>
+                    setFlatForm({ ...flatForm, societyId })
+                  }
+                />
+              ) : (
+                <InfoMessage text="A society submitted by you must be verified by admin before you can register its flat." />
+              )}
+            </Card>
+            <Card style={styles.formSection}>
+              <FormSectionHeader
+                icon="grid"
+                title="Flat details"
+                subtitle="Enter the flat number and property information"
+              />
+              <TextField
+                placeholder="Flat number *"
+                value={flatForm.flatNumber}
+                onChangeText={flatNumber =>
+                  setFlatForm({ ...flatForm, flatNumber })
+                }
+              />
+              <TextField
+                placeholder="Block"
+                value={flatForm.block}
+                onChangeText={block => setFlatForm({ ...flatForm, block })}
+              />
+              <TextField
+                placeholder="Floor number"
+                value={flatForm.floorNumber?.toString() ?? ''}
+                onChangeText={value =>
+                  setFlatForm({
+                    ...flatForm,
+                    floorNumber: value ? Number(value) : undefined,
+                  })
+                }
+                keyboardType="number-pad"
+              />
+              <TextField
+                placeholder="Flat type (e.g. 2BHK) *"
+                value={flatForm.flatType}
+                onChangeText={flatType =>
+                  setFlatForm({ ...flatForm, flatType })
+                }
+              />
+              <TextField
+                placeholder="Area (sq. ft.)"
+                value={flatForm.area?.toString() ?? ''}
+                onChangeText={value =>
+                  setFlatForm({
+                    ...flatForm,
+                    area: value ? Number(value) : undefined,
+                  })
+                }
+                keyboardType="decimal-pad"
+              />
+            </Card>
             <ActionButton
               title={
                 flatMutation.isLoading || flatUpdateMutation.isLoading
@@ -718,13 +970,17 @@ const CustomerAssetsScreen = ({ route }: Props) => {
           <FormSheet
             visible={formVisible}
             title={editingCar ? 'Edit car' : 'Register a car'}
+            subtitle="Add vehicle details and link it to your registered flat."
+            icon="truck"
             onClose={() => setFormVisible(false)}
           >
             {error ? <InfoMessage text={error} variant="error" /> : null}
-            <Card>
-              <Text style={styles.cardTitle}>
-                {editingCar ? 'Edit car' : 'Register a car'}
-              </Text>
+            <Card style={styles.formSection}>
+              <FormSectionHeader
+                icon="map-pin"
+                title="Parking location"
+                subtitle="Select a verified society and flat"
+              />
               {!approvedSocieties.length ? (
                 <InfoMessage text="A verified society is required before registering a car." />
               ) : null}
@@ -752,9 +1008,13 @@ const CustomerAssetsScreen = ({ route }: Props) => {
                 selected={carForm.flatId}
                 onSelect={flatId => setCarForm({ ...carForm, flatId })}
               />
-              <Text style={styles.fieldLabel}>
-                Owner contact details are taken from your profile.
-              </Text>
+            </Card>
+            <Card style={styles.formSection}>
+              <FormSectionHeader
+                icon="truck"
+                title="Vehicle details"
+                subtitle="Owner contact details are taken from your profile"
+              />
               <TextField
                 placeholder="Registration number *"
                 value={carForm.registrationNumber}
@@ -778,9 +1038,37 @@ const CustomerAssetsScreen = ({ route }: Props) => {
                 value={carForm.color}
                 onChangeText={color => setCarForm({ ...carForm, color })}
               />
-              <Text style={styles.fieldLabel}>
-                Car image (optional, max 5 MB)
-              </Text>
+              <ChoiceList
+                title="Car type"
+                items={(
+                  [
+                    'Hatchback',
+                    'Sedan',
+                    'SUV',
+                    'MUV',
+                    'Luxury',
+                    'Other',
+                  ] as const
+                ).map(type => ({ id: type, label: type }))}
+                selected={carForm.carType}
+                onSelect={carType =>
+                  setCarForm({ ...carForm, carType: carType as Car['carType'] })
+                }
+              />
+              <TextField
+                placeholder="Parking slot (optional)"
+                value={carForm.parkingSlot}
+                onChangeText={parkingSlot =>
+                  setCarForm({ ...carForm, parkingSlot })
+                }
+              />
+            </Card>
+            <Card style={styles.formSection}>
+              <FormSectionHeader
+                icon="image"
+                title="Car photo"
+                subtitle="Optional · JPEG or PNG up to 5 MB"
+              />
               {carImagePreview ? (
                 <Image
                   source={{ uri: carImagePreview }}
@@ -811,29 +1099,12 @@ const CustomerAssetsScreen = ({ route }: Props) => {
                   carUpdateMutation.isLoading
                 }
               />
-              <ChoiceList
-                title="Car type"
-                items={(
-                  [
-                    'Hatchback',
-                    'Sedan',
-                    'SUV',
-                    'MUV',
-                    'Luxury',
-                    'Other',
-                  ] as const
-                ).map(type => ({ id: type, label: type }))}
-                selected={carForm.carType}
-                onSelect={carType =>
-                  setCarForm({ ...carForm, carType: carType as Car['carType'] })
-                }
-              />
-              <TextField
-                placeholder="Parking slot (optional)"
-                value={carForm.parkingSlot}
-                onChangeText={parkingSlot =>
-                  setCarForm({ ...carForm, parkingSlot })
-                }
+            </Card>
+            <Card style={styles.formSection}>
+              <FormSectionHeader
+                icon="check-circle"
+                title="Save registration"
+                subtitle="Your car will be reviewed before it is available for booking"
               />
               <ActionButton
                 title={
@@ -868,27 +1139,6 @@ const CustomerAssetsScreen = ({ route }: Props) => {
               ) : null}
             </Card>
           </FormSheet>
-          <ListHeading title="Registered cars" count={cars.length} />
-          <View style={styles.list}>
-            {cars.length ? (
-              cars.map(car => (
-                <CarCard
-                  key={car._id}
-                  car={car}
-                  onPress={() => setSelectedCar(car)}
-                  onEdit={() => startCarEdit(car)}
-                  onDelete={() => removeCar(car)}
-                  busy={carDeleteMutation.isLoading}
-                />
-              ))
-            ) : (
-              <EmptyRegistration
-                icon="truck"
-                title="No cars registered"
-                description="Add your car details to make it available for wash bookings."
-              />
-            )}
-          </View>
         </>
       ) : null}
       <DetailsSheet
@@ -898,32 +1148,59 @@ const CustomerAssetsScreen = ({ route }: Props) => {
       >
         {selectedSociety ? (
           <>
-            <AssetDetail title="Status" value={selectedSociety.status} />
-            <AssetDetail
-              title="Address"
-              value={[
-                selectedSociety.address,
-                selectedSociety.city,
-                selectedSociety.state,
-                selectedSociety.pincode,
-              ]
-                .filter(Boolean)
-                .join(', ')}
-            />
-            <AssetDetail
-              title="Contact person"
-              value={selectedSociety.contactPerson}
-            />
-            <AssetDetail title="Phone" value={selectedSociety.phone} />
-            <AssetDetail title="Email" value={selectedSociety.email} />
-            <AssetDetail
-              title="Description"
-              value={selectedSociety.description}
-            />
-            <AssetDetail
-              title="Admin note"
-              value={selectedSociety.verificationNote}
-            />
+            <Card style={styles.detailHero}>
+              <View style={styles.assetDetailHeroHeader}>
+                <View style={styles.detailHeroIcon}>
+                  <Feather name="home" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.assetTitleGroup}>
+                  <Text style={styles.cardTitle}>{selectedSociety.name}</Text>
+                  <Text style={styles.detail} numberOfLines={2}>
+                    {selectedSociety.city}
+                    {selectedSociety.state ? `, ${selectedSociety.state}` : ''}
+                  </Text>
+                </View>
+                <Status value={selectedSociety.status} />
+              </View>
+              <View style={styles.detailHeroMeta}>
+                <Feather name="map-pin" size={14} color={colors.primary} />
+                <Text style={styles.detailHeroMetaText}>
+                  {selectedSociety.address}
+                  {selectedSociety.pincode
+                    ? ` · ${selectedSociety.pincode}`
+                    : ''}
+                </Text>
+              </View>
+            </Card>
+            <AssetSection icon="map" title="Community location">
+              <AssetDetail
+                title="Address"
+                value={[
+                  selectedSociety.address,
+                  selectedSociety.city,
+                  selectedSociety.state,
+                  selectedSociety.pincode,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+              />
+              <AssetDetail
+                title="Description"
+                value={selectedSociety.description}
+              />
+            </AssetSection>
+            <AssetSection icon="phone" title="Contact & verification">
+              <AssetDetail
+                title="Contact person"
+                value={selectedSociety.contactPerson}
+              />
+              <AssetDetail title="Phone" value={selectedSociety.phone} />
+              <AssetDetail title="Email" value={selectedSociety.email} />
+              <AssetDetail
+                title="Admin note"
+                value={selectedSociety.verificationNote}
+              />
+            </AssetSection>
           </>
         ) : null}
       </DetailsSheet>
@@ -940,31 +1217,76 @@ const CustomerAssetsScreen = ({ route }: Props) => {
       >
         {selectedFlat ? (
           <>
-            <AssetDetail
-              title="Society"
-              value={label(selectedFlat.societyId)}
-            />
-            <AssetDetail
-              title="Verification"
-              value={selectedFlat.verificationStatus}
-            />
-            <AssetDetail title="Type" value={selectedFlat.flatType} />
-            <AssetDetail
-              title="Floor"
-              value={selectedFlat.floorNumber?.toString()}
-            />
-            <AssetDetail
-              title="Area"
-              value={
-                selectedFlat.area ? `${selectedFlat.area} sq. ft.` : undefined
-              }
-            />
-            <AssetDetail title="Occupancy" value={selectedFlat.status} />
-            <AssetDetail title="Description" value={selectedFlat.description} />
-            <AssetDetail
-              title="Admin note"
-              value={selectedFlat.verificationNote}
-            />
+            <Card style={styles.detailHero}>
+              <View style={styles.assetDetailHeroHeader}>
+                <View style={styles.detailHeroIcon}>
+                  <Feather name="grid" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.assetTitleGroup}>
+                  <Text style={styles.cardTitle}>
+                    {selectedFlat.block ? `${selectedFlat.block} · ` : ''}
+                    {selectedFlat.flatNumber}
+                  </Text>
+                  <Text style={styles.detail} numberOfLines={1}>
+                    {label(selectedFlat.societyId)} ·{' '}
+                    {selectedFlat.flatType || 'Flat'}
+                  </Text>
+                </View>
+                <Status value={selectedFlat.verificationStatus} />
+              </View>
+              <View style={styles.assetTagRow}>
+                <Status value={selectedFlat.status} />
+                {selectedFlat.floorNumber !== undefined ? (
+                  <View style={styles.assetTag}>
+                    <Text style={styles.assetTagText}>
+                      Floor {selectedFlat.floorNumber}
+                    </Text>
+                  </View>
+                ) : null}
+                {selectedFlat.area ? (
+                  <View style={styles.assetTag}>
+                    <Text style={styles.assetTagText}>
+                      {selectedFlat.area} sq. ft.
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </Card>
+            <AssetSection icon="grid" title="Flat information">
+              <AssetDetail
+                title="Society"
+                value={label(selectedFlat.societyId)}
+              />
+              <AssetDetail title="Type" value={selectedFlat.flatType} />
+              <AssetDetail
+                title="Floor"
+                value={selectedFlat.floorNumber?.toString()}
+              />
+              <AssetDetail
+                title="Area"
+                value={
+                  selectedFlat.area ? `${selectedFlat.area} sq. ft.` : undefined
+                }
+              />
+              <AssetDetail
+                title="Description"
+                value={selectedFlat.description}
+              />
+            </AssetSection>
+            <AssetSection icon="check-circle" title="Verification">
+              <AssetDetail
+                title="Verification status"
+                value={selectedFlat.verificationStatus}
+              />
+              <AssetDetail
+                title="Occupancy status"
+                value={selectedFlat.status}
+              />
+              <AssetDetail
+                title="Admin note"
+                value={selectedFlat.verificationNote}
+              />
+            </AssetSection>
           </>
         ) : null}
       </DetailsSheet>
@@ -975,36 +1297,75 @@ const CustomerAssetsScreen = ({ route }: Props) => {
       >
         {selectedCar ? (
           <>
-            {selectedCar.imageUrl ? (
-              <Image
-                source={{ uri: selectedCar.imageUrl }}
-                style={styles.carImagePreview}
+            <Card style={styles.detailHero}>
+              {selectedCar.imageUrl ? (
+                <Image
+                  source={{ uri: selectedCar.imageUrl }}
+                  style={styles.carDetailImage}
+                />
+              ) : (
+                <View style={styles.carDetailPlaceholder}>
+                  <Feather name="truck" size={30} color={colors.primary} />
+                </View>
+              )}
+              <View style={styles.assetDetailHeroHeader}>
+                <View style={styles.assetTitleGroup}>
+                  <Text style={styles.cardTitle}>
+                    {selectedCar.registrationNumber}
+                  </Text>
+                  <Text style={styles.detail}>
+                    {selectedCar.make} {selectedCar.model}
+                  </Text>
+                </View>
+                <Status value={selectedCar.verificationStatus} />
+              </View>
+              <View style={styles.assetTagRow}>
+                <Status value={selectedCar.status} />
+                <View style={styles.assetTag}>
+                  <Text style={styles.assetTagText}>{selectedCar.carType}</Text>
+                </View>
+                <View style={styles.assetTag}>
+                  <Text style={styles.assetTagText}>{selectedCar.color}</Text>
+                </View>
+              </View>
+            </Card>
+            <AssetSection icon="truck" title="Vehicle information">
+              <AssetDetail
+                title="Make and model"
+                value={`${selectedCar.make} ${selectedCar.model}`}
               />
-            ) : null}
-            <AssetDetail
-              title="Vehicle"
-              value={`${selectedCar.make} ${selectedCar.model}`}
-            />
-            <AssetDetail
-              title="Verification"
-              value={selectedCar.verificationStatus}
-            />
-            <AssetDetail
-              title="Type and color"
-              value={`${selectedCar.carType} · ${selectedCar.color}`}
-            />
-            <AssetDetail title="Society" value={label(selectedCar.societyId)} />
-            <AssetDetail title="Flat" value={label(selectedCar.flatId)} />
-            <AssetDetail title="Parking slot" value={selectedCar.parkingSlot} />
-            <AssetDetail title="Vehicle status" value={selectedCar.status} />
-            <AssetDetail title="Owner" value={selectedCar.ownerName} />
-            <AssetDetail title="Phone" value={selectedCar.ownerPhone} />
-            <AssetDetail title="Email" value={selectedCar.ownerEmail} />
-            <AssetDetail title="Description" value={selectedCar.description} />
-            <AssetDetail
-              title="Admin note"
-              value={selectedCar.verificationNote}
-            />
+              <AssetDetail title="Type" value={selectedCar.carType} />
+              <AssetDetail title="Color" value={selectedCar.color} />
+              <AssetDetail
+                title="Parking slot"
+                value={selectedCar.parkingSlot}
+              />
+              <AssetDetail title="Vehicle status" value={selectedCar.status} />
+            </AssetSection>
+            <AssetSection icon="map-pin" title="Parking location">
+              <AssetDetail
+                title="Society"
+                value={label(selectedCar.societyId)}
+              />
+              <AssetDetail title="Flat" value={label(selectedCar.flatId)} />
+            </AssetSection>
+            <AssetSection icon="user" title="Owner & verification">
+              <AssetDetail title="Owner" value={selectedCar.ownerName} />
+              <AssetDetail title="Phone" value={selectedCar.ownerPhone} />
+              <AssetDetail title="Email" value={selectedCar.ownerEmail} />
+              <AssetDetail
+                title="Description"
+                value={selectedCar.description}
+              />
+              <AssetDetail
+                title="Verification status"
+                value={selectedCar.verificationStatus}
+              />
+              <AssetDetail
+                title="Admin note"
+                value={selectedCar.verificationNote}
+              />
+            </AssetSection>
           </>
         ) : null}
       </DetailsSheet>
@@ -1083,17 +1444,31 @@ const ListHeading = ({ title, count }: { title: string; count: number }) => (
 const FormSheet = ({
   visible,
   title,
+  subtitle,
+  icon,
   onClose,
   children,
 }: React.PropsWithChildren<{
   visible: boolean;
   title: string;
+  subtitle: string;
+  icon: string;
   onClose: () => void;
 }>) => (
   <BottomSheet visible={visible} setVisible={onClose}>
     <View style={styles.formSheet}>
       <View style={styles.formSheetHeader}>
-        <Text style={styles.formSheetTitle}>{title}</Text>
+        <View style={styles.formHeaderIcon}>
+          <Feather name={icon} size={19} color={colors.primary} />
+        </View>
+        <View style={styles.formHeaderCopy}>
+          <Text style={styles.formSheetTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          <Text style={styles.formSheetSubtitle} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close form"
@@ -1104,7 +1479,10 @@ const FormSheet = ({
         </Pressable>
       </View>
       <ScrollView
+        style={styles.formSheetScroll}
         keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={styles.formSheetContent}
       >
         {children}
@@ -1113,17 +1491,61 @@ const FormSheet = ({
   </BottomSheet>
 );
 
-const Status = ({ value }: { value: string }) => (
-  <Text
-    style={[
-      styles.status,
-      value === 'VERIFIED' && styles.statusGood,
-      value === 'REJECTED' && styles.statusBad,
-    ]}
-  >
-    {value}
-  </Text>
+const FormSectionHeader = ({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+}) => (
+  <View style={styles.formSectionHeader}>
+    <View style={styles.formSectionIcon}>
+      <Feather name={icon} size={15} color={colors.primary} />
+    </View>
+    <View style={styles.formSectionCopy}>
+      <Text style={styles.formSectionTitle}>{title}</Text>
+      <Text style={styles.formSectionSubtitle}>{subtitle}</Text>
+    </View>
+  </View>
 );
+
+const Status = ({ value }: { value: string }) => {
+  const isGood = ['VERIFIED', 'Active', 'Available'].includes(value);
+  const isBad = ['REJECTED', 'Inactive'].includes(value);
+  const isMaintenance = value === 'Maintenance';
+  const label =
+    value === 'VERIFIED'
+      ? 'Verified'
+      : value === 'PENDING'
+      ? 'Pending'
+      : value === 'REJECTED'
+      ? 'Rejected'
+      : value;
+
+  return (
+    <View
+      style={[
+        styles.status,
+        isGood && styles.statusGood,
+        isBad && styles.statusBad,
+        isMaintenance && styles.statusWarning,
+      ]}
+    >
+      <Text
+        style={[
+          styles.statusText,
+          isGood && styles.statusGoodText,
+          isBad && styles.statusBadText,
+          isMaintenance && styles.statusWarningText,
+        ]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+};
 
 const SocietyCard = ({
   society,
@@ -1132,31 +1554,37 @@ const SocietyCard = ({
   society: Society;
   onPress: () => void;
 }) => (
-  <Card>
+  <Card style={styles.assetCard}>
     <ListItemPressable
       accessibilityLabel={`View ${society.name} details`}
       onPress={onPress}
       style={styles.assetSummary}
     >
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {society.name}
-        </Text>
+      <View style={styles.assetCardHeader}>
+        <View style={styles.assetIcon}>
+          <Feather name="home" size={18} color={colors.primary} />
+        </View>
+        <View style={styles.assetTitleGroup}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {society.name}
+          </Text>
+          <Text style={styles.assetSubtitle}>Residential community</Text>
+        </View>
         <Status value={society.status || 'PENDING'} />
       </View>
-      <Text style={styles.detail} numberOfLines={2}>
-        {society.address}, {society.city}
-        {society.state ? `, ${society.state}` : ''}
-      </Text>
+      <View style={styles.assetMetaRow}>
+        <Feather name="map-pin" size={14} color={colors.primary} />
+        <Text style={styles.detail} numberOfLines={2}>
+          {society.address}, {society.city}
+          {society.state ? `, ${society.state}` : ''}
+        </Text>
+      </View>
       {society.verificationNote ? (
         <Text style={styles.note} numberOfLines={2}>
           Admin note: {society.verificationNote}
         </Text>
       ) : null}
-      <View style={styles.viewDetails}>
-        <Text style={styles.viewDetailsText}>View full details</Text>
-        <Feather name="chevron-right" size={16} color={colors.primary} />
-      </View>
+      <AssetCardFooter />
     </ListItemPressable>
   </Card>
 );
@@ -1174,33 +1602,52 @@ const FlatCard = ({
   onDelete: () => void;
   busy: boolean;
 }) => (
-  <Card>
+  <Card style={styles.assetCard}>
     <ListItemPressable
       accessibilityLabel={`View flat ${flat.flatNumber} details`}
       onPress={onPress}
       style={styles.assetSummary}
     >
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {flat.block ? `${flat.block} · ` : ''}
-          {flat.flatNumber}
-        </Text>
+      <View style={styles.assetCardHeader}>
+        <View style={styles.assetIcon}>
+          <Feather name="grid" size={18} color={colors.primary} />
+        </View>
+        <View style={styles.assetTitleGroup}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {flat.block ? `${flat.block} · ` : ''}
+            {flat.flatNumber}
+          </Text>
+          <Text style={styles.assetSubtitle} numberOfLines={1}>
+            {label(flat.societyId)}
+          </Text>
+        </View>
         <Status value={flat.verificationStatus || 'PENDING'} />
       </View>
-      <Text style={styles.detail} numberOfLines={1}>
-        {label(flat.societyId)} · {flat.flatType || 'Flat'}
-      </Text>
+      <View style={styles.assetTagRow}>
+        <View style={styles.assetTag}>
+          <Feather name="layers" size={12} color={colors.primary} />
+          <Text style={styles.assetTagText}>{flat.flatType || 'Flat'}</Text>
+        </View>
+        <Status value={flat.status} />
+        {flat.floorNumber !== undefined ? (
+          <View style={styles.assetTag}>
+            <Text style={styles.assetTagText}>Floor {flat.floorNumber}</Text>
+          </View>
+        ) : null}
+        {flat.area ? (
+          <View style={styles.assetTag}>
+            <Text style={styles.assetTagText}>{flat.area} sq. ft.</Text>
+          </View>
+        ) : null}
+      </View>
       {flat.verificationNote ? (
         <Text style={styles.note} numberOfLines={2}>
           Admin note: {flat.verificationNote}
         </Text>
       ) : null}
-      <View style={styles.viewDetails}>
-        <Text style={styles.viewDetailsText}>View full details</Text>
-        <Feather name="chevron-right" size={16} color={colors.primary} />
-      </View>
+      <AssetCardFooter />
     </ListItemPressable>
-    <View style={styles.actions}>
+    <View style={styles.assetActions}>
       <IconAction icon="edit-2" label="Edit flat" onPress={onEdit} />
       <IconAction
         icon="trash-2"
@@ -1226,35 +1673,54 @@ const CarCard = ({
   onDelete: () => void;
   busy: boolean;
 }) => (
-  <Card>
+  <Card style={styles.assetCard}>
     <ListItemPressable
       accessibilityLabel={`View ${car.registrationNumber} details`}
       onPress={onPress}
       style={styles.assetSummary}
     >
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {car.registrationNumber}
-        </Text>
+      <View style={styles.assetCardHeader}>
+        {car.imageUrl ? (
+          <Image source={{ uri: car.imageUrl }} style={styles.carThumbnail} />
+        ) : (
+          <View style={styles.assetIcon}>
+            <Feather name="truck" size={18} color={colors.primary} />
+          </View>
+        )}
+        <View style={styles.assetTitleGroup}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {car.registrationNumber}
+          </Text>
+          <Text style={styles.assetSubtitle} numberOfLines={1}>
+            {car.make} {car.model}
+          </Text>
+        </View>
         <Status value={car.verificationStatus || 'PENDING'} />
       </View>
-      <Text style={styles.detail} numberOfLines={1}>
-        {car.make} {car.model} · {car.carType}
-      </Text>
-      <Text style={styles.detail} numberOfLines={1}>
-        {label(car.societyId)} · {label(car.flatId)}
-      </Text>
+      <View style={styles.assetMetaRow}>
+        <Feather name="map-pin" size={14} color={colors.primary} />
+        <Text style={styles.detail} numberOfLines={1}>
+          {label(car.societyId)} · {label(car.flatId)}
+        </Text>
+      </View>
+      <View style={styles.assetTagRow}>
+        <View style={styles.assetTag}>
+          <Feather name="truck" size={12} color={colors.primary} />
+          <Text style={styles.assetTagText}>{car.carType}</Text>
+        </View>
+        <View style={styles.assetTag}>
+          <Text style={styles.assetTagText}>{car.color}</Text>
+        </View>
+        <Status value={car.status} />
+      </View>
       {car.verificationNote ? (
         <Text style={styles.note} numberOfLines={2}>
           Admin note: {car.verificationNote}
         </Text>
       ) : null}
-      <View style={styles.viewDetails}>
-        <Text style={styles.viewDetailsText}>View full details</Text>
-        <Feather name="chevron-right" size={16} color={colors.primary} />
-      </View>
+      <AssetCardFooter />
     </ListItemPressable>
-    <View style={styles.actions}>
+    <View style={styles.assetActions}>
       <IconAction icon="edit-2" label="Edit car" onPress={onEdit} />
       <IconAction
         icon="trash-2"
@@ -1267,11 +1733,34 @@ const CarCard = ({
   </Card>
 );
 
+const AssetCardFooter = () => (
+  <View style={styles.viewDetails}>
+    <Text style={styles.viewDetailsText}>View full details</Text>
+    <Feather name="chevron-right" size={16} color={colors.primary} />
+  </View>
+);
+
 const AssetDetail = ({ title, value }: { title: string; value?: string }) => (
   <View style={styles.assetDetail}>
     <Text style={styles.assetDetailLabel}>{title}</Text>
     <Text style={styles.assetDetailValue}>{value || '—'}</Text>
   </View>
+);
+
+const AssetSection = ({
+  icon,
+  title,
+  children,
+}: React.PropsWithChildren<{ icon: string; title: string }>) => (
+  <Card style={styles.detailSection}>
+    <View style={styles.detailSectionHeading}>
+      <View style={styles.detailSectionIcon}>
+        <Feather name={icon} size={15} color={colors.primary} />
+      </View>
+      <Text style={styles.detailSectionTitle}>{title}</Text>
+    </View>
+    {children}
+  </Card>
 );
 
 const IconAction = ({
@@ -1343,6 +1832,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
   },
+  activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  activeFilterLabel: { fontSize: 11, fontWeight: '600', color: colors.muted },
+  activeFilterChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
+  },
+  activeFilterText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primaryDark,
+  },
   formSheet: {
     maxHeight: '90%',
     borderTopLeftRadius: 22,
@@ -1351,13 +1853,24 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   formSheetHeader: {
-    minHeight: 50,
+    minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 11,
     paddingHorizontal: 18,
+    paddingVertical: 8,
   },
-  formSheetTitle: { fontSize: 17, fontWeight: '800', color: colors.ink },
+  formHeaderIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: colors.paleBlue,
+  },
+  formHeaderCopy: { flex: 1, gap: 3 },
+  formSheetTitle: { fontSize: 16, fontWeight: '800', color: colors.ink },
+  formSheetSubtitle: { fontSize: 11, lineHeight: 15, color: colors.muted },
   closeButton: {
     width: 34,
     height: 34,
@@ -1367,6 +1880,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvas,
   },
   formSheetContent: { gap: 12, padding: 16, paddingBottom: 28 },
+  formSheetScroll: { flexShrink: 1 },
+  formSection: { gap: 12, borderRadius: 17 },
+  formSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 2,
+  },
+  formSectionIcon: {
+    width: 31,
+    height: 31,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
+  },
+  formSectionCopy: { flex: 1, gap: 2 },
+  formSectionTitle: { fontSize: 13, fontWeight: '800', color: colors.ink },
+  formSectionSubtitle: { fontSize: 11, lineHeight: 15, color: colors.muted },
   emptyRegistration: { alignItems: 'flex-start', gap: 8, borderRadius: 15 },
   emptyRegistrationIcon: {
     width: 42,
@@ -1375,6 +1907,57 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 14,
     backgroundColor: colors.paleBlue,
+  },
+  assetCard: { gap: 10, borderRadius: 17, paddingVertical: 14 },
+  assetCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  assetIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.paleBlue,
+  },
+  assetTitleGroup: { flex: 1, gap: 3 },
+  assetSubtitle: { fontSize: 11, color: colors.muted },
+  carThumbnail: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.canvas,
+  },
+  assetMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+  },
+  assetTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  assetTag: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    borderRadius: 9,
+    backgroundColor: colors.canvas,
+  },
+  assetTagText: { fontSize: 11, fontWeight: '700', color: colors.muted },
+  assetActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 7,
+    paddingTop: 5,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1387,12 +1970,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 40,
+    minHeight: 34,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
     paddingTop: 6,
   },
   viewDetailsText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  assetDetailHeroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  detailHero: { gap: 13, borderRadius: 18, padding: 15 },
+  detailHeroIcon: {
+    width: 43,
+    height: 43,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.paleBlue,
+  },
+  detailHeroMeta: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    padding: 11,
+    borderRadius: 12,
+    backgroundColor: colors.canvas,
+  },
+  detailHeroMetaText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.ink,
+  },
+  detailSection: { gap: 6, borderRadius: 17 },
+  detailSectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 3,
+  },
+  detailSectionIcon: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
+  },
+  detailSectionTitle: { fontSize: 14, fontWeight: '800', color: colors.ink },
   assetDetail: {
     gap: 3,
     paddingVertical: 9,
@@ -1401,6 +2028,20 @@ const styles = StyleSheet.create({
   },
   assetDetailLabel: { fontSize: 11, fontWeight: '600', color: colors.muted },
   assetDetailValue: { fontSize: 14, lineHeight: 20, color: colors.ink },
+  carDetailImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+    backgroundColor: colors.canvas,
+  },
+  carDetailPlaceholder: {
+    width: '100%',
+    height: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.paleBlue,
+  },
   cardTitle: {
     fontSize: 16,
     fontWeight: '800',
@@ -1410,17 +2051,18 @@ const styles = StyleSheet.create({
   detail: { fontSize: 13, lineHeight: 19, color: colors.muted },
   note: { fontSize: 13, color: colors.danger },
   status: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#9A6700',
     backgroundColor: '#FFF4CE',
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 20,
-    overflow: 'hidden',
   },
-  statusGood: { color: colors.success, backgroundColor: '#E8F5EE' },
-  statusBad: { color: colors.danger, backgroundColor: '#FDECEA' },
+  statusText: { fontSize: 11, fontWeight: '800', color: '#9A6700' },
+  statusGood: { backgroundColor: '#E8F5EE' },
+  statusBad: { backgroundColor: '#FDECEA' },
+  statusWarning: { backgroundColor: '#FFF4CE' },
+  statusGoodText: { color: colors.success },
+  statusBadText: { color: colors.danger },
+  statusWarningText: { color: '#9A6700' },
   fieldLabel: { fontSize: 13, color: colors.ink, fontWeight: '700' },
   choiceGroup: { gap: 8 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },

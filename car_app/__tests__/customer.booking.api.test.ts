@@ -1,14 +1,14 @@
-import {configureStore} from '@reduxjs/toolkit';
-import authReducer, {setCredentials} from '../app/store/auth.slice';
-import {api} from '../app/store/api';
-import {customerApi} from '../app/store/customer.api';
-import {workerApi} from '../app/store/worker.api';
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer, { setCredentials } from '../app/store/auth.slice';
+import { api } from '../app/store/api';
+import { customerApi } from '../app/store/customer.api';
+import { workerApi } from '../app/store/worker.api';
 import {
   getRequestUiSnapshot,
   resolveApiConfirmation,
   subscribeToRequestUi,
 } from '../app/store/request-ui';
-import type {CustomerBookingPayload} from '../app/store/customer.api';
+import type { CustomerBookingPayload } from '../app/store/customer.api';
 
 const createTestStore = () =>
   configureStore({
@@ -18,8 +18,7 @@ const createTestStore = () =>
     },
     middleware: getDefaultMiddleware =>
       getDefaultMiddleware().concat(api.middleware),
-    enhancers: getDefaultEnhancers =>
-      getDefaultEnhancers({autoBatch: false}),
+    enhancers: getDefaultEnhancers => getDefaultEnhancers({ autoBatch: false }),
   });
 
 describe('customer booking API', () => {
@@ -49,6 +48,7 @@ describe('customer booking API', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     store.dispatch(api.util.resetApiState());
     fetchMock.mockRestore();
     unsubscribeConfirmation();
@@ -60,11 +60,11 @@ describe('customer booking API', () => {
         JSON.stringify({
           success: true,
           data: {
-            data: [{_id: 'booking-1', status: 'Pending'}],
-            meta: {page: 1, limit: 100, total: 1, totalPage: 1},
+            data: [{ _id: 'booking-1', status: 'Pending' }],
+            meta: { page: 1, limit: 100, total: 1, totalPage: 1 },
           },
         }),
-        {status: 200, headers: {'content-type': 'application/json'}},
+        { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     );
 
@@ -79,7 +79,7 @@ describe('customer booking API', () => {
     expect(fetchRequest.headers.get('authorization')).toBe(
       'Bearer customer-test-token',
     );
-    expect(result.data).toEqual([{_id: 'booking-1', status: 'Pending'}]);
+    expect(result.data).toEqual([{ _id: 'booking-1', status: 'Pending' }]);
   });
 
   it('does not block the app while a screen data query is pending', async () => {
@@ -98,13 +98,37 @@ describe('customer booking API', () => {
 
     expect(getRequestUiSnapshot().activeRequests).toBe(0);
     resolveFetch?.(
-      new Response(
-        JSON.stringify({success: true, data: {data: []}}),
-        {status: 200, headers: {'content-type': 'application/json'}},
-      ),
+      new Response(JSON.stringify({ success: true, data: { data: [] } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
     );
     await request.unwrap();
     request.unsubscribe();
+  });
+
+  it('ends a mutation that never receives a response', async () => {
+    jest.useFakeTimers();
+    fetchMock.mockImplementationOnce(() => new Promise<Response>(() => {}));
+
+    const request = store.dispatch(
+      customerApi.endpoints.createCustomerBooking.initiate({
+        societyId: '507f1f77bcf86cd799439011',
+        flatId: '507f1f77bcf86cd799439012',
+        carId: '507f1f77bcf86cd799439013',
+        serviceId: '507f1f77bcf86cd799439014',
+        slotId: '507f1f77bcf86cd799439015',
+        bookingDate: '2026-10-31',
+        bookingTime: '09:30',
+        paymentType: 'Individual',
+      }),
+    );
+
+    await jest.advanceTimersByTimeAsync(15_000);
+    await expect(request.unwrap()).rejects.toBeDefined();
+    expect(getRequestUiSnapshot().activeRequests).toBe(0);
+
+    jest.useRealTimers();
   });
 
   it('loads the signed-in customer payment history with method filters', async () => {
@@ -112,10 +136,10 @@ describe('customer booking API', () => {
       new Response(
         JSON.stringify({
           success: true,
-          data: [{_id: 'cash-payment-1', provider: 'Cash', status: 'Paid'}],
-          meta: {page: 1, limit: 20, total: 1, totalPages: 1},
+          data: [{ _id: 'cash-payment-1', provider: 'Cash', status: 'Paid' }],
+          meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
         }),
-        {status: 200, headers: {'content-type': 'application/json'}},
+        { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     );
 
@@ -142,9 +166,9 @@ describe('customer booking API', () => {
       new Response(
         JSON.stringify({
           success: true,
-          data: {_id: 'booking-1', status: 'Pending'},
+          data: { _id: 'booking-1', status: 'Pending' },
         }),
-        {status: 201, headers: {'content-type': 'application/json'}},
+        { status: 201, headers: { 'content-type': 'application/json' } },
       ),
     );
 
@@ -174,9 +198,9 @@ describe('customer booking API', () => {
       new Response(
         JSON.stringify({
           success: true,
-          data: {_id: 'booking-cash', status: 'Pending'},
+          data: { _id: 'booking-cash', status: 'Pending' },
         }),
-        {status: 201, headers: {'content-type': 'application/json'}},
+        { status: 201, headers: { 'content-type': 'application/json' } },
       ),
     );
 
@@ -205,9 +229,9 @@ describe('customer booking API', () => {
       new Response(
         JSON.stringify({
           success: true,
-          data: {_id: 'booking-cash', paymentStatus: 'Paid'},
+          data: { _id: 'booking-cash', paymentStatus: 'Paid' },
         }),
-        {status: 200, headers: {'content-type': 'application/json'}},
+        { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     );
 
@@ -237,9 +261,9 @@ describe('customer booking API', () => {
       new Response(
         JSON.stringify({
           success: true,
-          data: {_id: 'booking-2', status: 'Confirmed'},
+          data: { _id: 'booking-2', status: 'Confirmed' },
         }),
-        {status: 201, headers: {'content-type': 'application/json'}},
+        { status: 201, headers: { 'content-type': 'application/json' } },
       ),
     );
 
@@ -268,9 +292,9 @@ describe('customer booking API', () => {
       new Response(
         JSON.stringify({
           success: true,
-          data: [{_id: 'membership-1', status: 'Active'}],
+          data: [{ _id: 'membership-1', status: 'Active' }],
         }),
-        {status: 200, headers: {'content-type': 'application/json'}},
+        { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     );
 
@@ -282,7 +306,7 @@ describe('customer booking API', () => {
 
     const fetchRequest = fetchMock.mock.calls[0][0] as Request;
     expect(fetchRequest.url).toContain('/api/v1/memberships/mine');
-    expect(result.data).toEqual([{_id: 'membership-1', status: 'Active'}]);
+    expect(result.data).toEqual([{ _id: 'membership-1', status: 'Active' }]);
   });
 
   it('uploads car images through the authenticated server endpoint', async () => {
@@ -290,9 +314,9 @@ describe('customer booking API', () => {
       new Response(
         JSON.stringify({
           success: true,
-          data: {url: 'https://images.example/car.jpg'},
+          data: { url: 'https://images.example/car.jpg' },
         }),
-        {status: 200, headers: {'content-type': 'application/json'}},
+        { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     );
 
@@ -321,9 +345,9 @@ describe('customer booking API', () => {
       new Response(
         JSON.stringify({
           success: true,
-          data: {_id: 'membership-1', paymentStatus: 'Pending'},
+          data: { _id: 'membership-1', paymentStatus: 'Pending' },
         }),
-        {status: 201, headers: {'content-type': 'application/json'}},
+        { status: 201, headers: { 'content-type': 'application/json' } },
       ),
     );
 

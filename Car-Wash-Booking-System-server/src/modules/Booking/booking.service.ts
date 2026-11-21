@@ -587,7 +587,7 @@ const updateBooking = async (
   }
   await releaseSlot(booking.slotId);
   if (booking.customerId) {
-    await NotificationService.sendCustomerNotification(
+    void NotificationService.sendCustomerNotification(
       booking.customerId,
       'CarWash booking rescheduled',
       `Your booking is now scheduled for ${nextDate.toLocaleDateString()} at ${nextTime}.`,

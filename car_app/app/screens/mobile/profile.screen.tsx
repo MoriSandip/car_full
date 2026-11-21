@@ -2,11 +2,11 @@ import React from 'react';
 import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import {
+  Card,
   colors,
   InfoMessage,
-  LoadingMessage,
+  LoadingSkeleton,
   Page,
-  PageTitle,
 } from '../../components/mobile/ui';
 import {useGetCustomerProfileQuery} from '../../store/customer.api';
 import {useGetWorkerProfileQuery} from '../../store/worker.api';
@@ -51,11 +51,6 @@ const ProfileScreen = () => {
 
   return (
     <Page contentStyle={styles.page}>
-      <PageTitle compact
-        title="My profile"
-        subtitle="Your personal information and account details."
-      />
-
       <View style={styles.profileHero}>
         <View style={styles.heroDecoration} />
         <View style={styles.heroTop}>
@@ -100,7 +95,7 @@ const ProfileScreen = () => {
       </View>
 
       {isLoading ? (
-        <LoadingMessage text="Loading profile..." />
+        <LoadingSkeleton rows={3} />
       ) : isError ? (
         <InfoMessage
           text="Could not load your profile. Please refresh and try again."
@@ -178,7 +173,7 @@ const ProfileSection = ({
 }: React.PropsWithChildren<{title: string}>) => (
   <View style={styles.section}>
     <Text style={styles.sectionTitle}>{title}</Text>
-    <View style={styles.detailsCard}>{children}</View>
+    <Card style={styles.detailsCard}>{children}</Card>
   </View>
 );
 
@@ -203,7 +198,7 @@ const ProfileRow = ({
 );
 
 const styles = StyleSheet.create({
-  page: {paddingTop: 22, gap: 20},
+  page: {paddingTop: 16, gap: 12},
   profileHero: {
     overflow: 'hidden',
     padding: 22,
@@ -282,10 +277,7 @@ const styles = StyleSheet.create({
   },
   detailsCard: {
     paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
-    backgroundColor: colors.white,
+    gap: 0,
   },
   detailRow: {
     minHeight: 72,

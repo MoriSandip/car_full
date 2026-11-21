@@ -1,8 +1,7 @@
-import React, {useMemo, useState} from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -11,16 +10,20 @@ import Feather from 'react-native-vector-icons/Feather';
 import {
   Card,
   colors,
+  FilterBottomSheet,
   InfoMessage,
-  LoadingMessage,
+  LoadingSkeleton,
   Page,
-  PageTitle,
+  SearchFilterBar,
 } from '../../components/mobile/ui';
-import {useGetMyBookingsQuery, useGetMyCarsQuery} from '../../store/customer.api';
-import {BookingPreview} from './customer-home.screen';
-import {Car, RelatedEntity} from '../../store/types';
-import {StackScreenProps} from '@react-navigation/stack';
-import {NavigatorParamList} from '../../navigators/navigation-route';
+import {
+  useGetMyBookingsQuery,
+  useGetMyCarsQuery,
+} from '../../store/customer.api';
+import { BookingPreview } from './customer-home.screen';
+import { Car, RelatedEntity } from '../../store/types';
+import { StackScreenProps } from '@react-navigation/stack';
+import { NavigatorParamList } from '../../navigators/navigation-route';
 
 type Props = StackScreenProps<NavigatorParamList, 'CustomerBookings'>;
 
@@ -28,22 +31,34 @@ const idOf = (value: RelatedEntity) =>
   typeof value === 'string' ? value : value?._id || '';
 
 const carTitle = (car: Car) =>
-  [
-    car.registrationNumber,
-    [car.make, car.model].filter(Boolean).join(' '),
-  ]
+  [car.registrationNumber, [car.make, car.model].filter(Boolean).join(' ')]
     .filter(Boolean)
     .join(' · ') || 'My car';
 
-const CustomerBookingsScreen = ({navigation}: Props) => {
-  const {data, isLoading, isError, refetch} =
-    useGetMyBookingsQuery(undefined, {pollingInterval: 30_000});
+const CustomerBookingsScreen = ({ navigation }: Props) => {
+  const { data, isLoading, isError, refetch } = useGetMyBookingsQuery(
+    undefined,
+    { pollingInterval: 30_000 },
+  );
   const carsQuery = useGetMyCarsQuery();
   const [selectedCarId, setSelectedCarId] = useState('all');
+  const [draftCarId, setDraftCarId] = useState(selectedCarId);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [search, setSearch] = useState('');
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
   const bookings = useMemo(() => data?.data ?? [], [data?.data]);
-  const cars = carsQuery.data?.data ?? [];
+  const cars = useMemo(
+    () => carsQuery.data?.data ?? [],
+    [carsQuery.data?.data],
+  );
+  const activeCar = cars.find(car => car._id === selectedCarId);
+  const activeCarLabel =
+    selectedCarId === 'all'
+      ? 'All cars'
+      : activeCar
+      ? carTitle(activeCar)
+      : 'Selected car';
   const historyBookings = useMemo(
     () =>
       selectedCarId === 'all'
@@ -51,6 +66,26 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
         : bookings.filter(booking => idOf(booking.carId) === selectedCarId),
     [bookings, selectedCarId],
   );
+  const visibleBookings = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return historyBookings;
+    return historyBookings.filter(booking => {
+      const car = cars.find(item => item._id === idOf(booking.carId));
+      const searchableText = [
+        booking.serviceNameSnapshot,
+        booking.bookingDate,
+        booking.bookingTime,
+        booking.status,
+        booking.paymentStatus,
+        booking.paymentMethod,
+        car ? carTitle(car) : idOf(booking.carId),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return searchableText.includes(term);
+    });
+  }, [cars, historyBookings, search]);
   const refreshPage = () => {
     setIsPullRefreshing(true);
     setRefreshError(false);
@@ -64,6 +99,9 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
 
   return (
     <Page
+      listData={isLoading || isError ? [] : visibleBookings}
+      listKeyExtractor={booking => booking._id}
+      renderListItem={({ item }) => <BookingPreview booking={item} />}
       refreshControl={
         <RefreshControl
           refreshing={isPullRefreshing}
@@ -71,59 +109,51 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
           tintColor={colors.primary}
           colors={[colors.primary]}
         />
-      }>
-      <PageTitle compact
-        title="My bookings"
-        subtitle="Track your scheduled washes, payment and service status."
+      }
+    >
+      <SearchFilterBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search bookings"
+        filterAccessibilityLabel={`Filter bookings, currently ${activeCarLabel}`}
+        hasActiveFilters={selectedCarId !== 'all'}
+        onFilterPress={() => {
+          setDraftCarId(selectedCarId);
+          setFilterVisible(true);
+        }}
       />
-      <View style={styles.filterSection}>
-        <Text style={styles.filterTitle}>Filter by car</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.carFilters}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{selected: selectedCarId === 'all'}}
-            onPress={() => setSelectedCarId('all')}
-            style={[
-              styles.carFilter,
-              selectedCarId === 'all' && styles.carFilterSelected,
-            ]}>
-            <Text
-              style={[
-                styles.carFilterText,
-                selectedCarId === 'all' && styles.carFilterTextSelected,
-              ]}
-              numberOfLines={1}>
-              All ({bookings.length})
-            </Text>
-          </Pressable>
-          {cars.map(car => {
-            const selected = selectedCarId === car._id;
-            const count = bookings.filter(
-              booking => idOf(booking.carId) === car._id,
-            ).length;
-            return (
-              <Pressable
-                key={car._id}
-                accessibilityRole="button"
-                accessibilityState={{selected}}
-                onPress={() => setSelectedCarId(car._id)}
-                style={[styles.carFilter, selected && styles.carFilterSelected]}>
-                <Text
-                  style={[
-                    styles.carFilterText,
-                    selected && styles.carFilterTextSelected,
-                  ]}
-                  numberOfLines={1}>
-                  {car.registrationNumber || carTitle(car)} ({count})
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+      <View style={styles.activeFilters}>
+        <Text style={styles.activeFilterLabel}>Showing</Text>
+        <View style={styles.activeFilterChip}>
+          <Text style={styles.activeFilterText}>{activeCarLabel}</Text>
+        </View>
       </View>
+      <FilterBottomSheet
+        visible={filterVisible}
+        setVisible={setFilterVisible}
+        title="Filter bookings"
+        subtitle="Choose which vehicle’s bookings to show"
+        groups={[
+          {
+            key: 'car',
+            title: 'Vehicle',
+            value: draftCarId,
+            defaultValue: 'all',
+            options: [
+              { label: `All cars (${bookings.length})`, value: 'all' },
+              ...cars.map(car => ({
+                label: `${car.registrationNumber || carTitle(car)} (${
+                  bookings.filter(booking => idOf(booking.carId) === car._id)
+                    .length
+                })`,
+                value: car._id,
+              })),
+            ],
+            onChange: setDraftCarId,
+          },
+        ]}
+        onApply={() => setSelectedCarId(draftCarId)}
+      />
       {refreshError ? (
         <InfoMessage
           text="Some booking details could not be refreshed. Pull down to try again."
@@ -131,7 +161,7 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
         />
       ) : null}
       {isLoading ? (
-        <LoadingMessage text="Loading your bookings..." />
+        <LoadingSkeleton rows={3} />
       ) : isError ? (
         <InfoMessage
           text="Could not load your bookings. Please retry."
@@ -150,12 +180,23 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
           <Pressable
             accessibilityRole="button"
             onPress={() =>
-              navigation.navigate('CustomerMain', {screen: 'CustomerBooking'})
+              navigation.navigate('CustomerMain', { screen: 'CustomerBooking' })
             }
-            style={styles.emptyAction}>
+            style={styles.emptyAction}
+          >
             <Text style={styles.emptyActionText}>Book your first wash</Text>
             <Feather name="arrow-right" size={16} color={colors.white} />
           </Pressable>
+        </Card>
+      ) : visibleBookings.length === 0 && search.trim() ? (
+        <Card style={styles.emptyCard}>
+          <View style={styles.emptyIcon}>
+            <Feather name="search" size={21} color={colors.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>No matching bookings</Text>
+          <Text style={styles.emptyCopy}>
+            Try a different service, vehicle, date, or payment term.
+          </Text>
         </Card>
       ) : historyBookings.length === 0 ? (
         <Card style={styles.emptyCard}>
@@ -170,44 +211,37 @@ const CustomerBookingsScreen = ({navigation}: Props) => {
           <Pressable
             accessibilityRole="button"
             onPress={() =>
-              navigation.navigate('CustomerMain', {screen: 'CustomerBooking'})
+              navigation.navigate('CustomerMain', { screen: 'CustomerBooking' })
             }
-            style={styles.emptyAction}>
+            style={styles.emptyAction}
+          >
             <Text style={styles.emptyActionText}>Book a wash</Text>
             <Feather name="arrow-right" size={16} color={colors.white} />
           </Pressable>
         </Card>
-      ) : (
-        <View style={styles.list}>
-          {historyBookings.map(booking => (
-            <BookingPreview key={booking._id} booking={booking} />
-          ))}
-        </View>
-      )}
+      ) : null}
     </Page>
   );
 };
 
 const styles = StyleSheet.create({
-  list: {gap: 8},
-  filterSection: {gap: 8},
-  filterTitle: {fontSize: 14, fontWeight: '800', color: colors.ink},
-  carFilters: {flexDirection: 'row', gap: 7, paddingRight: 4},
-  carFilter: {
-    maxWidth: 190,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    backgroundColor: colors.white,
+  activeFilters: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  activeFilterLabel: { fontSize: 11, fontWeight: '600', color: colors.muted },
+  activeFilterChip: {
+    maxWidth: '80%',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
   },
-  carFilterSelected: {backgroundColor: colors.paleBlue, borderColor: colors.primary},
-  carFilterText: {flexShrink: 1, fontSize: 12, color: colors.muted, fontWeight: '600'},
-  carFilterTextSelected: {color: colors.primary},
-  emptyTitle: {fontSize: 16, fontWeight: '800', color: colors.ink},
-  emptyCopy: {fontSize: 13, lineHeight: 19, color: colors.muted},
-  emptyCard: {alignItems: 'flex-start', gap: 12, borderRadius: 19},
+  activeFilterText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.primaryDark,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: colors.ink },
+  emptyCopy: { fontSize: 13, lineHeight: 19, color: colors.muted },
+  emptyCard: { alignItems: 'flex-start', gap: 12, borderRadius: 19 },
   emptyIcon: {
     width: 46,
     height: 46,
@@ -226,7 +260,7 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: colors.primary,
   },
-  emptyActionText: {fontSize: 13, fontWeight: '800', color: colors.white},
+  emptyActionText: { fontSize: 13, fontWeight: '800', color: colors.white },
 });
 
 export default CustomerBookingsScreen;

@@ -40,7 +40,12 @@ const FilterView = ({visible, setVisible}: IFilterProps) => {
           <Text style={styles.text}>Filters</Text>
           <View style={styles._f08} />
         </View>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.filterContainer}>
             <TabSwitcher
               title="Type of Cars"
