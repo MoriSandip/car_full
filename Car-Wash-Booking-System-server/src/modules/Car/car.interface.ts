@@ -40,6 +40,7 @@ export type TCar = {
   verifiedBy?: Types.ObjectId | null;
   verifiedAt?: Date | null;
   verificationNote?: string;
+  qrToken?: string;
 
   isDeleted: boolean;
 };

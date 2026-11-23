@@ -15,6 +15,12 @@ const carStatusSchema = z.enum([
   "Maintenance",
 ]);
 
+export const carQrParamsSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Car ID"),
+  }),
+});
+
 export const createCarValidationSchema = z.object({
   body: z
     .object({

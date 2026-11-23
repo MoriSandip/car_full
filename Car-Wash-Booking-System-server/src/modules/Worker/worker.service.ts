@@ -5,6 +5,7 @@ import { WorkerSearchableFields, WORKER_STATUS } from './worker.constant';
 import { TWorker } from './worker.interface';
 import { Worker } from './worker.model';
 import Booking from '../Booking/booking.model';
+import { Car } from '../Car/car.model';
 import Membership from '../Membership/membership.model';
 import { AttendanceServices } from '../Attendance/attendance.service';
 import { getScheduledDateTime } from '../../app/utils/scheduledDateTime';
@@ -23,6 +24,13 @@ const getIndiaDateKey = (date: Date) => {
     parts.find((item) => item.type === type)?.value;
 
   return `${part('year')}-${part('month')}-${part('day')}`;
+};
+
+const getReferenceId = (value: unknown) => {
+  if (typeof value === 'object' && value !== null && '_id' in value) {
+    return String(value._id);
+  }
+  return String(value ?? '');
 };
 
 const createWorkerIntoDB = async (payload: TWorker) => {
@@ -307,7 +315,19 @@ const getAssignedBookingsFromDB = async (
       total,
       totalPage: Math.ceil(total / limit),
     },
-    data,
+    data: data.map(booking => {
+      const verifiedAt = booking.vehicleQrVerifiedAt;
+      return {
+        ...booking,
+        vehicleQrVerifiedForWorker: Boolean(
+          verifiedAt &&
+            getIndiaDateKey(verifiedAt) === getIndiaDateKey(new Date()) &&
+            String(booking.vehicleQrVerifiedBy) === workerId &&
+            getReferenceId(booking.vehicleQrVerifiedCarId) ===
+              getReferenceId(booking.carId),
+        ),
+      };
+    }),
   };
 };
 
@@ -448,6 +468,67 @@ const updateAssignedBookingProgress = async (
   return booking;
 };
 
+const verifyAssignedVehicleQr = async (
+  workerId: string,
+  bookingId: string,
+  qrToken: string,
+) => {
+  if (!Types.ObjectId.isValid(workerId) || !Types.ObjectId.isValid(bookingId)) {
+    throw new AppError(400, 'Invalid worker or booking ID');
+  }
+
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    workerId: new Types.ObjectId(workerId),
+    isDeleted: false,
+  });
+  if (!booking) throw new AppError(404, 'Assigned booking not found');
+  if (
+    booking.status === 'Cancelled' ||
+    booking.status === 'Completed' ||
+    (booking.workStatus || 'NotStarted') !== 'NotStarted'
+  ) {
+    throw new AppError(400, 'Vehicle QR can only be verified before work starts');
+  }
+
+  const now = new Date();
+  const scheduledStartTime = getScheduledDateTime(
+    booking.bookingDate,
+    booking.bookingTime,
+  );
+  if (getIndiaDateKey(scheduledStartTime) !== getIndiaDateKey(now)) {
+    throw new AppError(400, 'Vehicle QR can only be verified on the booking date');
+  }
+
+  const car = await Car.findOne({
+    qrToken,
+    isDeleted: false,
+    status: 'Active',
+    verificationStatus: 'VERIFIED',
+  }).select('_id registrationNumber make model');
+  if (!car) {
+    throw new AppError(400, 'This QR code is invalid or the car is not active and verified');
+  }
+  if (String(car._id) !== String(booking.carId)) {
+    throw new AppError(400, 'This QR code does not match the vehicle assigned to this booking');
+  }
+
+  booking.vehicleQrVerifiedAt = now;
+  booking.vehicleQrVerifiedBy = new Types.ObjectId(workerId);
+  booking.vehicleQrVerifiedCarId = new Types.ObjectId(String(booking.carId));
+  await booking.save();
+
+  return {
+    bookingId: String(booking._id),
+    verifiedAt: now,
+    car: {
+      registrationNumber: car.registrationNumber,
+      make: car.make,
+      model: car.model,
+    },
+  };
+};
+
 const updateAssignedBookingWork = async (
   workerId: string,
   bookingId: string,
@@ -537,6 +618,30 @@ const updateAssignedBookingWork = async (
 
     if (!["Pending", "Confirmed"].includes(booking.status)) {
       throw new Error("Only pending or confirmed bookings can be started");
+    }
+
+    const qrVerifiedToday =
+      booking.vehicleQrVerifiedAt &&
+      getIndiaDateKey(booking.vehicleQrVerifiedAt) === getIndiaDateKey(now);
+    if (
+      !qrVerifiedToday ||
+      String(booking.vehicleQrVerifiedBy) !== workerId ||
+      String(booking.vehicleQrVerifiedCarId) !== String(booking.carId)
+    ) {
+      throw new AppError(
+        400,
+        "Scan and verify the customer's car QR code before starting work",
+      );
+    }
+
+    const verifiedCar = await Car.exists({
+      _id: booking.carId,
+      isDeleted: false,
+      status: 'Active',
+      verificationStatus: 'VERIFIED',
+    });
+    if (!verifiedCar) {
+      throw new AppError(400, 'The assigned car is no longer active and verified');
     }
 
     if (!booking.beforePhoto) {
@@ -819,6 +924,7 @@ export const WorkerServices = {
   workerLoginFromDB,
   getWorkerDashboard,
   getAssignedBookingsFromDB,
+  verifyAssignedVehicleQr,
   getMyCashTransactionsFromDB,
   updateAssignedBookingProgress,
   updateAssignedBookingWork

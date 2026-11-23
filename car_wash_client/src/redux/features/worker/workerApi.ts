@@ -358,6 +358,17 @@ updateWorkerBookingWorkAction: builder.mutation<
   }),
   invalidatesTags: ["Worker", "PaymentTransactions"],
 }),
+verifyWorkerBookingVehicle: builder.mutation<
+  { success: boolean; data: { bookingId: string; verifiedAt: string } },
+  { id: string; qrToken: string }
+>({
+  query: ({ id, qrToken }) => ({
+    url: `/workers/assigned-bookings/${id}/verify-vehicle`,
+    method: "POST",
+    body: { qrToken },
+  }),
+  invalidatesTags: ["Worker"],
+}),
 updateWorkerBookingProgress: builder.mutation<
   unknown,
   {
@@ -519,6 +530,7 @@ export const {
   useGetWorkerAssignedBookingsQuery,
   useGetMyProfileQuery,
   useUpdateWorkerBookingWorkActionMutation,
+  useVerifyWorkerBookingVehicleMutation,
   useUpdateWorkerBookingProgressMutation,
   useGetMyAttendanceQuery,
   useGetMyAttendanceHistoryQuery,

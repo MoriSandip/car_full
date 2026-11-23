@@ -31,6 +31,7 @@ import {
   useGetCustomerComplaintsQuery,
   useReplyToCustomerComplaintMutation,
 } from "@/redux/features/complaint/complaintApi";
+import { useGetPublicAppSettingsQuery } from "@/redux/features/settings/settingsApi";
 
 const dateTime = (value: string) =>
   new Date(value).toLocaleString(undefined, {
@@ -63,6 +64,7 @@ const CustomerSupport = () => {
   const [initialMessage, setInitialMessage] = useState("");
   const [reply, setReply] = useState("");
   const ticketsQuery = useGetCustomerComplaintsQuery({ page: 1, limit: 100 });
+  const publicSettingsQuery = useGetPublicAppSettingsQuery();
   const ticketQuery = useGetCustomerComplaintQuery(
     { id: selectedId },
     { skip: !selectedId },
@@ -71,6 +73,7 @@ const CustomerSupport = () => {
   const [replyToTicket, replyState] = useReplyToCustomerComplaintMutation();
   const tickets = ticketsQuery.data?.data.data ?? [];
   const ticket = ticketQuery.data?.data;
+  const supportContact = publicSettingsQuery.data?.data.general;
 
   const submitTicket = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -175,6 +178,28 @@ const CustomerSupport = () => {
           </DialogContent>
         </Dialog>
       </div>
+      {supportContact?.supportEmail || supportContact?.supportPhone ? (
+        <p className="text-sm text-slate-600">
+          Need urgent help?{" "}
+          {supportContact.supportEmail ? (
+            <a
+              className="font-medium text-sky-700 hover:underline"
+              href={`mailto:${supportContact.supportEmail}`}
+            >
+              {supportContact.supportEmail}
+            </a>
+          ) : null}
+          {supportContact.supportEmail && supportContact.supportPhone ? " · " : ""}
+          {supportContact.supportPhone ? (
+            <a
+              className="font-medium text-sky-700 hover:underline"
+              href={`tel:${supportContact.supportPhone}`}
+            >
+              {supportContact.supportPhone}
+            </a>
+          ) : null}
+        </p>
+      ) : null}
 
       {selectedId ? ticketQuery.isLoading ? (
         <Card>

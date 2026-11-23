@@ -134,7 +134,7 @@ const WorkerHomeScreen = ({navigation}: Props) => {
             pressed && styles.jobsButtonPressed,
           ]}>
           <Feather name="briefcase" size={16} color={colors.primaryDark} />
-          <Text style={styles.jobsButtonText}>Open assigned jobs</Text>
+          <Text style={styles.jobsButtonText}>Open my schedule</Text>
           <Feather
             name="arrow-up-right"
             size={17}
@@ -193,7 +193,7 @@ const WorkerHomeScreen = ({navigation}: Props) => {
           accessibilityRole="button"
           onPress={() => navigation.navigate('WorkerJobs')}
           style={styles.allJobsButton}>
-          <Text style={styles.link}>All jobs</Text>
+          <Text style={styles.link}>View schedule</Text>
           <Feather name="arrow-right" size={15} color={colors.primary} />
         </Pressable>
       </View>

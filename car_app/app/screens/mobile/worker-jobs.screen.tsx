@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  FlatList,
   Image,
   PermissionsAndroid,
   Platform,
@@ -13,6 +12,12 @@ import {
 } from 'react-native';
 import dayjs, { type Dayjs } from 'dayjs';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { Camera, CameraType } from 'react-native-camera-kit';
+import {
+  PERMISSIONS,
+  RESULTS,
+  request as requestPermission,
+} from 'react-native-permissions';
 import Feather from 'react-native-vector-icons/Feather';
 import {
   ActionButton,
@@ -31,6 +36,7 @@ import {
   useGetAssignedBookingsQuery,
   useGetMyAttendanceQuery,
   usePerformWorkActionMutation,
+  useVerifyAssignedVehicleQrMutation,
   useUpdateCleaningProgressMutation,
 } from '../../store/worker.api';
 import {
@@ -72,11 +78,11 @@ const WorkerJobsScreen = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [actionError, setActionError] = useState('');
+  const [scanBooking, setScanBooking] = useState<Booking | null>(null);
   const [month, setMonth] = useState<Dayjs>(() => dayjs().startOf('month'));
   const [selectedDay, setSelectedDay] = useState<Dayjs>(() =>
-    dayjs().startOf('day'),
+    dayjs(),
   );
-  const dayListRef = useRef<FlatList<Dayjs>>(null);
   const monthDays = useMemo(
     () =>
       Array.from(
@@ -85,10 +91,14 @@ const WorkerJobsScreen = () => {
       ),
     [month],
   );
-  const selectedDayIndex = Math.max(
-    0,
-    monthDays.findIndex(day => day.isSame(selectedDay, 'day')),
-  );
+  const calendarDays = useMemo(() => {
+    const cells: Array<Dayjs | null> = [
+      ...Array.from({ length: month.day() }, () => null),
+      ...monthDays,
+    ];
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [month, monthDays]);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
@@ -123,8 +133,10 @@ const WorkerJobsScreen = () => {
     isError: attendanceError,
   } = useGetMyAttendanceQuery();
   const [performAction, mutation] = usePerformWorkActionMutation();
+  const [verifyVehicleQr, qrMutation] = useVerifyAssignedVehicleQrMutation();
   const [updateProgress, progressMutation] =
     useUpdateCleaningProgressMutation();
+  const scanHandled = useRef(false);
   const jobs = useMemo(() => data?.data ?? [], [data?.data]);
   const pendingCount = jobs.filter(job =>
     ['Pending', 'Confirmed'].includes(job.status),
@@ -162,6 +174,14 @@ const WorkerJobsScreen = () => {
       return searchableText.includes(term);
     });
   }, [jobs, debouncedSearch, status]);
+  const jobsByDay = useMemo(() => {
+    const counts = new Map<string, number>();
+    visibleJobs.forEach(job => {
+      const dayKey = dayjs(job.bookingDate).format('YYYY-MM-DD');
+      counts.set(dayKey, (counts.get(dayKey) ?? 0) + 1);
+    });
+    return counts;
+  }, [visibleJobs]);
   const selectedDayJobs = useMemo(
     () =>
       visibleJobs.filter(
@@ -179,6 +199,11 @@ const WorkerJobsScreen = () => {
       }),
     [selectedDayJobs],
   );
+  const goToToday = () => {
+    const today = dayjs();
+    setMonth(today.startOf('month'));
+    setSelectedDay(today);
+  };
 
   const runAction = async (
     booking: Booking,
@@ -200,6 +225,45 @@ const WorkerJobsScreen = () => {
         action,
         ...(cashReceived === undefined ? {} : { cashReceived }),
       }).unwrap();
+    } catch (error) {
+      setActionError(errorMessage(error));
+    }
+  };
+  const beginVehicleScan = async (booking: Booking) => {
+    setActionError('');
+    try {
+      const permission =
+        Platform.OS === 'ios'
+          ? PERMISSIONS.IOS.CAMERA
+          : PERMISSIONS.ANDROID.CAMERA;
+      const result = await requestPermission(permission);
+      if (result !== RESULTS.GRANTED) {
+        Alert.alert(
+          'Camera permission required',
+          'Allow camera access in your device settings to scan the car QR code.',
+        );
+        return;
+      }
+      scanHandled.current = false;
+      setScanBooking(booking);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    }
+  };
+  const handleVehicleQrRead = async (event: {
+    nativeEvent: { codeStringValue: string };
+  }) => {
+    const qrToken = event.nativeEvent.codeStringValue.trim();
+    if (!scanBooking || !qrToken || scanHandled.current) return;
+    scanHandled.current = true;
+    const bookingId = scanBooking._id;
+    setScanBooking(null);
+    try {
+      await verifyVehicleQr({ bookingId, qrToken }).unwrap();
+      Alert.alert(
+        'Vehicle verified',
+        'You can now start this assigned wash.',
+      );
     } catch (error) {
       setActionError(errorMessage(error));
     }
@@ -233,6 +297,8 @@ const WorkerJobsScreen = () => {
         <JobCard
           job={job}
           disabled={mutation.isLoading}
+          qrDisabled={qrMutation.isLoading}
+          onScanVehicle={() => beginVehicleScan(job)}
           now={now}
           onAction={(action, cashReceived) => {
             if (action === 'start') {
@@ -291,6 +357,13 @@ const WorkerJobsScreen = () => {
         <Text style={styles.monthLabel}>{month.format('MMMM YYYY')}</Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Go to today"
+          onPress={goToToday}
+          style={styles.todayButton}>
+          <Text style={styles.todayButtonText}>Today</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
           accessibilityLabel="Next month"
           onPress={() => {
             const next = month.add(1, 'month');
@@ -311,68 +384,67 @@ const WorkerJobsScreen = () => {
           value={isLoading ? '—' : cancelledCount}
         />
       </View>
-      <FlatList
-        key={month.format('YYYY-MM')}
-        ref={dayListRef}
-        horizontal
-        data={monthDays}
-        initialScrollIndex={selectedDayIndex}
-        getItemLayout={(_, index) => ({
-          length: 72,
-          offset: 72 * index,
-          index,
-        })}
-        onScrollToIndexFailed={({ index }) => {
-          dayListRef.current?.scrollToOffset({
-            offset: 72 * index,
-            animated: false,
-          });
-        }}
-        keyExtractor={day => day.format('YYYY-MM-DD')}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.days}
-        accessibilityLabel={`${month.format('MMMM YYYY')} booking dates`}
-        renderItem={({ item: day }) => {
-          const dayKey = day.format('YYYY-MM-DD');
-          const count = jobs.filter(
-            job => dayjs(job.bookingDate).format('YYYY-MM-DD') === dayKey,
-          ).length;
-          const selected = dayKey === selectedDay.format('YYYY-MM-DD');
-          const isToday = day.isSame(dayjs(), 'day');
+      <View>
+        <View style={styles.weekdays}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(weekday => (
+            <Text key={weekday} style={styles.weekday}>
+              {weekday}
+            </Text>
+          ))}
+        </View>
+        <View
+          style={styles.calendarGrid}
+          accessibilityLabel={`${month.format('MMMM YYYY')} booking calendar`}>
+          {calendarDays.map((day, index) => {
+            if (!day) {
+              return (
+                <View
+                  key={`empty-${index}`}
+                  style={styles.calendarDay}
+                  accessible={false}
+                />
+              );
+            }
+            const dayKey = day.format('YYYY-MM-DD');
+            const count = jobsByDay.get(dayKey) ?? 0;
+            const selected = day.isSame(selectedDay, 'day');
+            const isToday = day.isSame(dayjs(), 'day');
 
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${isToday ? 'Today, ' : ''}${day.format(
-                'dddd, D MMMM',
-              )}, ${count} jobs`}
-              accessibilityState={{ selected }}
-              onPress={() => setSelectedDay(day)}
-              style={[
-                styles.day,
-                isToday && styles.today,
-                selected && styles.daySelected,
-              ]}
-            >
-              <Text
-                style={[styles.dayName, selected && styles.dayTextSelected]}
-              >
-                {isToday ? 'TODAY' : day.format('ddd')}
-              </Text>
-              <Text
-                style={[styles.dayNumber, selected && styles.dayTextSelected]}
-              >
-                {day.format('D')}
-              </Text>
-              <Text
-                style={[styles.dayCount, selected && styles.dayTextSelected]}
-              >
-                {count ? `${count} ${count === 1 ? 'job' : 'jobs'}` : '—'}
-              </Text>
-            </Pressable>
-          );
-        }}
-      />
+            return (
+              <Pressable
+                key={dayKey}
+                accessibilityRole="button"
+                accessibilityLabel={`${isToday ? 'Today, ' : ''}${day.format(
+                  'dddd, D MMMM',
+                )}, ${count} ${count === 1 ? 'job' : 'jobs'}`}
+                accessibilityState={{ selected }}
+                onPress={() => setSelectedDay(day)}
+                style={[
+                  styles.calendarDay,
+                  isToday && styles.today,
+                  selected && styles.daySelected,
+                ]}>
+                <Text
+                  style={[
+                    styles.dayNumber,
+                    selected && styles.dayTextSelected,
+                  ]}>
+                  {day.format('D')}
+                </Text>
+                {count > 0 ? (
+                  <Text
+                    style={[
+                      styles.dayCount,
+                      selected && styles.dayTextSelected,
+                    ]}>
+                    {count > 99 ? '99+' : count}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
       <SearchFilterBar
         value={search}
         onChangeText={setSearch}
@@ -414,6 +486,27 @@ const WorkerJobsScreen = () => {
         ]}
         onApply={() => setStatus(draftStatus)}
       />
+      <DetailsSheet
+        visible={Boolean(scanBooking)}
+        setVisible={visible => !visible && setScanBooking(null)}
+        title="Scan car QR code">
+        <Text style={styles.copy}>
+          Ask the customer to show the QR code for the car assigned to this wash.
+        </Text>
+        <Camera
+          style={styles.qrScanner}
+          cameraType={CameraType.Back}
+          scanBarcode
+          showFrame
+          allowedBarcodeTypes={['qr']}
+          onReadCode={handleVehicleQrRead}
+        />
+        <ActionButton
+          title="Cancel scan"
+          variant="secondary"
+          onPress={() => setScanBooking(null)}
+        />
+      </DetailsSheet>
       {actionError ? <InfoMessage text={actionError} variant="error" /> : null}
       {isLoading || (isFetching && !data) ? (
         <LoadingSkeleton rows={3} />
@@ -525,6 +618,8 @@ const ScheduleEmptyState = ({
 const JobCard = ({
   job,
   disabled,
+  qrDisabled,
+  onScanVehicle,
   now,
   onAction,
   onProgress,
@@ -533,6 +628,8 @@ const JobCard = ({
 }: {
   job: Booking;
   disabled: boolean;
+  qrDisabled: boolean;
+  onScanVehicle: () => void;
   now: number;
   onAction: (action: WorkAction, cashReceived?: boolean) => void;
   onProgress: (progress: {
@@ -1148,6 +1245,18 @@ const JobCard = ({
         </View>
         {shouldShowStartWorkAction(job) ? (
           <>
+            {job.vehicleQrVerifiedForWorker ? (
+              <Text style={styles.qrVerifiedText}>
+                Car QR verified for this wash.
+              </Text>
+            ) : (
+              <ActionButton
+                title="Scan car QR code"
+                variant="secondary"
+                onPress={onScanVehicle}
+                disabled={qrDisabled || !isBookingDateToday}
+              />
+            )}
             {!job.beforePhoto ? (
               <ActionButton
                 title="Take before-cleaning photo"
@@ -1159,7 +1268,12 @@ const JobCard = ({
             <ActionButton
               title="Start work"
               onPress={() => onAction('start')}
-              disabled={disabled || !startAllowed || !job.beforePhoto}
+              disabled={
+                disabled ||
+                !startAllowed ||
+                !job.beforePhoto ||
+                !job.vehicleQrVerifiedForWorker
+              }
             />
           </>
         ) : workStatus === 'Working' ? (
@@ -1314,6 +1428,18 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   title: { fontSize: 15, fontWeight: '800', color: colors.ink, flexShrink: 1 },
   copy: { fontSize: 13, lineHeight: 19, color: colors.muted },
+  qrScanner: {
+    width: '100%',
+    height: 320,
+    marginVertical: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  qrVerifiedText: {
+    color: colors.success,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   progressSection: {
     gap: 10,
     padding: 14,
@@ -1591,6 +1717,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  todayButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.paleBlue,
+  },
+  todayButtonText: {
+    color: colors.primaryDark,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   stats: { flexDirection: 'row', gap: 8 },
   stat: {
     flex: 1,
@@ -1606,21 +1743,36 @@ const styles = StyleSheet.create({
   },
   statNumber: { fontSize: 16, fontWeight: '900', color: colors.ink },
   statLabel: { fontSize: 10, fontWeight: '600', color: colors.muted },
-  days: { gap: 8, paddingVertical: 3 },
-  day: {
-    width: 64,
-    minHeight: 76,
+  weekdays: { flexDirection: 'row', marginBottom: 4 },
+  weekday: {
+    width: '14.2857%',
+    paddingVertical: 7,
+    textAlign: 'center',
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    overflow: 'hidden',
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+  },
+  calendarDay: {
+    width: '14.2857%',
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 14,
-    padding: 5,
-    backgroundColor: colors.white,
+    gap: 2,
   },
   today: { borderColor: colors.primary, borderWidth: 1.5 },
   daySelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  dayName: { fontSize: 10, fontWeight: '600', color: colors.muted },
   dayNumber: { fontSize: 15, color: colors.ink },
   dayCount: { fontSize: 9, color: colors.muted },
   dayTextSelected: { color: colors.white },

@@ -92,6 +92,10 @@ export const baseApi = createApi({
     "Reports",
     "Inventory",
     "Complaints",
+    "AdminAccess",
+    "AdminRoles",
+    "AdminUsers",
+    "AppSettings",
   ],
   endpoints: () => ({}),
 });

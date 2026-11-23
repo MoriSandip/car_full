@@ -174,6 +174,17 @@ const bookingSchema = new Schema<IBooking>(
       vacuumCleaning: { type: Boolean, default: false },
     },
     workerNotes: { type: String, trim: true, maxlength: 1000, default: '' },
+    vehicleQrVerifiedAt: { type: Date, default: null },
+    vehicleQrVerifiedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'Worker',
+      default: null,
+    },
+    vehicleQrVerifiedCarId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Car',
+      default: null,
+    },
     customerRating: { type: Number, min: 1, max: 5 },
     customerReview: { type: String, trim: true, maxlength: 1000, default: '' },
     reviewedAt: { type: Date },

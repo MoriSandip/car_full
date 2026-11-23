@@ -116,6 +116,10 @@ export type Booking = {
   status: 'Pending' | 'Confirmed' | 'InProgress' | 'Completed' | 'Cancelled';
   workStatus?: 'NotStarted' | 'Working' | 'Paused' | 'Completed';
   currentWorkStartedAt?: string | null;
+  vehicleQrVerifiedForWorker?: boolean;
+  vehicleQrVerifiedAt?: string | null;
+  vehicleQrVerifiedBy?: string | null;
+  vehicleQrVerifiedCarId?: string | null;
   totalWorkingSeconds?: number;
   workCompletedAt?: string | null;
   workSessions?: {

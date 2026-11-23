@@ -12,6 +12,7 @@ import { TSlots } from '../slots/slots.interface';
 import { NotificationService } from '../Notification/notification.service';
 import { getScheduledDateTime } from '../../app/utils/scheduledDateTime';
 import AppError from '../../app/errors/AppError';
+import { SettingsService } from '../Settings/settings.service';
 
 type ListParams = {
   searchTerm?: string;
@@ -87,6 +88,60 @@ const validateFutureSchedule = (bookingDate: Date, bookingTime: string) => {
   }
 };
 
+const indiaDateKey = (date: Date) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const part = (type: 'year' | 'month' | 'day') =>
+    parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+};
+
+const validateConfiguredBookingWindow = async (
+  societyId: Types.ObjectId | string,
+  bookingDate: Date,
+) => {
+  const settings = await SettingsService.getPublicSettings(String(societyId));
+  const bookingDateKey = bookingDate.toISOString().slice(0, 10);
+  const todayKey = indiaDateKey(new Date());
+  const daysAhead =
+    (Date.parse(`${bookingDateKey}T00:00:00.000Z`) -
+      Date.parse(`${todayKey}T00:00:00.000Z`)) /
+    86_400_000;
+
+  if (daysAhead === 0 && !settings.booking.allowSameDayBookings) {
+    throw new AppError(400, 'Same-day bookings are currently disabled.');
+  }
+  if (daysAhead > settings.booking.maxAdvanceDays) {
+    throw new AppError(
+      400,
+      `Bookings can be made up to ${settings.booking.maxAdvanceDays} days in advance.`,
+    );
+  }
+
+  return settings;
+};
+
+const validateConfiguredCancellationWindow = async (
+  societyId: Types.ObjectId | string,
+  bookingDate: Date,
+  bookingTime: string,
+) => {
+  const settings = await SettingsService.getPublicSettings(String(societyId));
+  if (settings.booking.cancellationCutoffHours === 0) return;
+  const scheduledAt = getScheduledDateTime(bookingDate, bookingTime);
+  const cutoffMs = settings.booking.cancellationCutoffHours * 3_600_000;
+  if (scheduledAt.getTime() - Date.now() <= cutoffMs) {
+    throw new AppError(
+      400,
+      'This booking is inside the cancellation cutoff window.',
+    );
+  }
+};
+
 const createBooking = async (data: any) => {
   const [car, society, flat, service] = await Promise.all([
     Car.findOne({
@@ -151,6 +206,10 @@ const createBooking = async (data: any) => {
     throw new Error('Invalid booking date');
   }
   validateFutureSchedule(bookingDate, data.bookingTime);
+  await validateConfiguredBookingWindow(
+    data.societyId,
+    bookingDate,
+  );
 
   const baseBooking = {
     ...data,
@@ -459,6 +518,24 @@ const updateBooking = async (
     throw new Error('Invalid booking date');
   }
   validateFutureSchedule(nextDate, nextTime);
+  const bookingSettings = await validateConfiguredBookingWindow(
+    booking.societyId,
+    nextDate,
+  );
+  const currentSchedule = getScheduledDateTime(
+    new Date(booking.bookingDate),
+    booking.bookingTime,
+  );
+  const reschedulingCutoff = bookingSettings.booking.reschedulingCutoffHours;
+  if (
+    reschedulingCutoff > 0 &&
+    currentSchedule.getTime() - Date.now() <= reschedulingCutoff * 3_600_000
+  ) {
+    throw new AppError(
+      400,
+      'This booking is inside the rescheduling cutoff window.',
+    );
+  }
 
   let membershipDateChange:
     | { membershipId: Types.ObjectId; oldDateKey: string; nextDateKey: string }
@@ -667,6 +744,13 @@ const changeBookingStatus = async (id: string, payload: any) => {
   if (nextStatus === 'Cancelled' && booking.workStatus !== 'NotStarted') {
     throw new Error('Started bookings cannot be cancelled by an admin');
   }
+  if (nextStatus === 'Cancelled') {
+    await validateConfiguredCancellationWindow(
+      booking.societyId,
+      new Date(booking.bookingDate),
+      booking.bookingTime,
+    );
+  }
 
   const update: Record<string, unknown> = {
     status: nextStatus,
@@ -758,6 +842,11 @@ const deleteBooking = async (id: string) => {
   ) {
     throw new Error('Only bookings that have not started can be deleted');
   }
+  await validateConfiguredCancellationWindow(
+    booking.societyId,
+    new Date(booking.bookingDate),
+    booking.bookingTime,
+  );
 
   const deleted = await Booking.findOneAndUpdate(
     {

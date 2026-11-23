@@ -23,6 +23,7 @@ import {
   useCreateSupportTicketMutation,
   useGetMySupportTicketQuery,
   useGetMySupportTicketsQuery,
+  useGetPublicAppSettingsQuery,
   useReplyToSupportTicketMutation,
 } from '../../store/customer.api';
 
@@ -53,9 +54,11 @@ const CustomerSupportScreen = () => {
   const [reply, setReply] = useState('');
   const [actionError, setActionError] = useState('');
   const ticketsQuery = useGetMySupportTicketsQuery();
+  const publicSettingsQuery = useGetPublicAppSettingsQuery();
   const ticketQuery = useGetMySupportTicketQuery(selectedId, {
     skip: !selectedId,
   });
+  const supportContact = publicSettingsQuery.data?.data.general;
   const [createTicket, createState] = useCreateSupportTicketMutation();
   const [replyToTicket, replyState] = useReplyToSupportTicketMutation();
   const tickets = ticketsQuery.data?.data ?? [];
@@ -269,6 +272,21 @@ const CustomerSupportScreen = () => {
           ) : null}
         </>
       )}
+      {supportContact?.supportEmail || supportContact?.supportPhone ? (
+        <Card style={styles.contactCard}>
+          <Text style={styles.contactLabel}>Urgent support contact</Text>
+          {supportContact.supportEmail ? (
+            <Text style={styles.contactValue}>
+              {supportContact.supportEmail}
+            </Text>
+          ) : null}
+          {supportContact.supportPhone ? (
+            <Text style={styles.contactValue}>
+              {supportContact.supportPhone}
+            </Text>
+          ) : null}
+        </Card>
+      ) : null}
 
       <Modal
         visible={createVisible}
@@ -388,6 +406,9 @@ const styles = StyleSheet.create({
   ticketMeta: {color: colors.muted, fontSize: 12},
   ticketDate: {color: colors.muted, fontSize: 11},
   createButton: {marginTop: 16},
+  contactCard: {gap: 5, marginTop: 16},
+  contactLabel: {color: '#172B3A', fontSize: 13, fontWeight: '700'},
+  contactValue: {color: colors.primaryDark, fontSize: 13},
   modalBackdrop: {
     backgroundColor: 'rgba(23, 43, 58, 0.45)',
     flex: 1,

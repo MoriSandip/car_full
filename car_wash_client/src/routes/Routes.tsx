@@ -49,6 +49,7 @@ import ReportsAnalytics from "@/pages/Dashboard/Reports/ReportsAnalytics";
 import InventoryManagement from "@/pages/Dashboard/Inventory/InventoryManagement";
 import ComplaintManagement from "@/pages/Dashboard/Complaints/ComplaintManagement";
 import CustomerSupport from "@/pages/CustomerDashboard/CustomerSupport";
+import SettingsPermissions from "@/pages/Dashboard/Settings/SettingsPermissions";
 
 const routes = createBrowserRouter([
   {
@@ -172,6 +173,10 @@ const routes = createBrowserRouter([
       {
         path: "dashboard/support",
         element: <ComplaintManagement />,
+      },
+      {
+        path: "dashboard/settings",
+        element: <SettingsPermissions />,
       },
       {
         path: "dashboard/leave-payroll",

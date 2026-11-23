@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   CarFront,
@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Timer,
   AlertCircle,
+  QrCode,
 } from "lucide-react";
 import { addMonths, endOfMonth, format, startOfMonth } from "date-fns";
 
@@ -56,6 +57,7 @@ import {
   useGetWorkerAssignedBookingsQuery,
   useUpdateWorkerBookingProgressMutation,
   useUpdateWorkerBookingWorkActionMutation,
+  useVerifyWorkerBookingVehicleMutation,
 } from "@/redux/features/worker/workerApi";
 
 type TWorkStatus = "NotStarted" | "Working" | "Paused" | "Completed";
@@ -90,6 +92,7 @@ type TBooking = {
   currentWorkStartedAt?: string | null;
   totalWorkingSeconds?: number;
   workCompletedAt?: string | null;
+  vehicleQrVerifiedForWorker?: boolean;
   workSessions?: TWorkSession[];
   beforePhoto?: string;
   afterPhoto?: string;
@@ -302,6 +305,8 @@ const AssignedBookings: React.FC = () => {
   const [detailBooking, setDetailBooking] = useState<TBooking | null>(null);
   const [cashCloseoutBooking, setCashCloseoutBooking] =
     useState<TBooking | null>(null);
+  const [scanBooking, setScanBooking] = useState<TBooking | null>(null);
+  const scannerVideoRef = useRef<HTMLVideoElement>(null);
   const monthStart = startOfMonth(selectedMonth);
   const monthDays = useMemo(
     () =>
@@ -316,6 +321,14 @@ const AssignedBookings: React.FC = () => {
       ),
     [selectedMonth],
   );
+  const calendarDays = useMemo(() => {
+    const cells: Array<Date | null> = [
+      ...Array.from({ length: monthStart.getDay() }, () => null),
+      ...monthDays,
+    ];
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [monthDays, monthStart]);
 
   const {
     data: response,
@@ -335,12 +348,59 @@ const AssignedBookings: React.FC = () => {
     useUpdateWorkerBookingWorkActionMutation();
   const [updateProgress, { isLoading: isSavingProgress }] =
     useUpdateWorkerBookingProgressMutation();
+  const [verifyWorkerBookingVehicle, { isLoading: isVerifyingVehicle }] =
+    useVerifyWorkerBookingVehicleMutation();
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!scanBooking) return;
+
+    let active = true;
+    let handled = false;
+    let stopScanner: (() => void) | undefined;
+    void import("@zxing/browser")
+      .then(({ BrowserQRCodeReader }) => {
+        if (!active || !scannerVideoRef.current) return;
+        const reader = new BrowserQRCodeReader();
+        return reader
+          .decodeFromVideoDevice(
+            undefined,
+            scannerVideoRef.current,
+            (result) => {
+              if (!active || handled || !result) return;
+              handled = true;
+              stopScanner?.();
+              const bookingId = scanBooking._id;
+              const qrToken = result.getText();
+              setScanBooking(null);
+              void verifyWorkerBookingVehicle({ id: bookingId, qrToken })
+                .unwrap()
+                .catch((error: unknown) =>
+                  setActionError(getErrorMessage(error)),
+                );
+            },
+          )
+          .then((controls) => {
+            stopScanner = () => controls.stop();
+            if (!active) stopScanner();
+          });
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setScanBooking(null);
+        setActionError(getErrorMessage(error));
+      });
+
+    return () => {
+      active = false;
+      stopScanner?.();
+    };
+  }, [scanBooking, verifyWorkerBookingVehicle]);
 
   const bookings: TBooking[] = useMemo(() => {
     const result = response as any;
@@ -385,6 +445,14 @@ const AssignedBookings: React.FC = () => {
       return byDate || (left.bookingTime || "").localeCompare(right.bookingTime || "");
     });
   }, [bookings, searchTerm, statusFilter]);
+  const bookingsByDay = useMemo(() => {
+    const counts = new Map<string, number>();
+    filteredBookings.forEach((booking) => {
+      const dateKey = formatDateKey(booking.bookingDate);
+      if (dateKey) counts.set(dateKey, (counts.get(dateKey) || 0) + 1);
+    });
+    return counts;
+  }, [filteredBookings]);
 
   const selectedDayBookings = useMemo(
     () =>
@@ -399,6 +467,11 @@ const AssignedBookings: React.FC = () => {
     const nextMonth = startOfMonth(addMonths(selectedMonth, amount));
     setSelectedMonth(nextMonth);
     setSelectedDay(nextMonth);
+  };
+  const goToToday = () => {
+    const today = new Date();
+    setSelectedMonth(startOfMonth(today));
+    setSelectedDay(today);
   };
 
   const pendingCount = bookings.filter((booking) =>
@@ -641,6 +714,21 @@ const AssignedBookings: React.FC = () => {
     if (workStatus === "NotStarted") {
       return (
         <div className="space-y-2">
+        {booking.vehicleQrVerifiedForWorker ? (
+          <span className="text-xs font-medium text-green-700">
+            Car QR verified for this wash.
+          </span>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy || isVerifyingVehicle || isSavingProgress}
+            onClick={() => setScanBooking(booking)}
+          >
+            <QrCode className="mr-1 h-4 w-4" />
+            Scan car QR code
+          </Button>
+        )}
           {cleaningDetails}
           <Button
             size="sm"
@@ -648,8 +736,10 @@ const AssignedBookings: React.FC = () => {
               busy ||
               isUpdating ||
               isSavingProgress ||
+              !booking.status ||
               !["Pending", "Confirmed"].includes(booking.status) ||
-              !booking.beforePhoto
+              !booking.beforePhoto ||
+              !booking.vehicleQrVerifiedForWorker
             }
             onClick={() => handleWorkAction(booking, "start")}
           >
@@ -732,10 +822,10 @@ const AssignedBookings: React.FC = () => {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Monthly Schedule
+            My Schedule
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            View all assigned jobs for the selected month and track your working hours.
+            Browse assigned jobs by month and see the time-sorted agenda for each day.
           </p>
         </div>
 
@@ -821,6 +911,39 @@ const AssignedBookings: React.FC = () => {
       </Dialog>
 
       <Dialog
+        open={Boolean(scanBooking)}
+        onOpenChange={(open) => {
+          if (!open) setScanBooking(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Scan the customer&apos;s car QR code</DialogTitle>
+            <DialogDescription>
+              Scan the QR code for the car assigned to this booking. Starting
+              work will be enabled after the server verifies it.
+            </DialogDescription>
+          </DialogHeader>
+          <video
+            ref={scannerVideoRef}
+            className="aspect-video w-full rounded-md bg-black object-cover"
+            autoPlay
+            muted
+            playsInline
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setScanBooking(null)}
+              disabled={isVerifyingVehicle}
+            >
+              Close scanner
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={Boolean(cashCloseoutBooking)}
         onOpenChange={(open) => {
           if (!open) setCashCloseoutBooking(null);
@@ -879,10 +1002,14 @@ const AssignedBookings: React.FC = () => {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span aria-live="polite">
-              {format(monthStart, "MMM d")} –{" "}
-              {format(endOfMonth(selectedMonth), "MMM d, yyyy")}
-            </span>
+            <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+              <span aria-live="polite" className="text-center">
+                {format(selectedMonth, "MMMM yyyy")}
+              </span>
+              <Button variant="ghost" size="sm" onClick={goToToday}>
+                Today
+              </Button>
+            </div>
             <Button
               variant="outline"
               size="icon"
@@ -896,49 +1023,80 @@ const AssignedBookings: React.FC = () => {
 
         <CardContent className="space-y-4">
           <div
-            className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2"
+            className="overflow-hidden rounded-md border"
             role="group"
-            aria-label={`${format(selectedMonth, "MMMM yyyy")} booking dates`}
+            aria-label={`${format(selectedMonth, "MMMM yyyy")} booking calendar`}
           >
-            {monthDays.map((day) => {
-              const dayCount = bookings.filter(
-                (booking) =>
-                  formatDateKey(booking.bookingDate) === formatDateKey(day),
-              ).length;
-              const selected =
-                formatDateKey(day) === formatDateKey(selectedDay);
+            <div className="grid grid-cols-7 bg-muted/40">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                (weekday) => (
+                  <div
+                    key={weekday}
+                    className="border-b px-1 py-2 text-center text-xs font-medium text-muted-foreground"
+                  >
+                    {weekday}
+                  </div>
+                ),
+              )}
+            </div>
+            <div className="grid grid-cols-7">
+              {calendarDays.map((day, index) => {
+                if (!day) {
+                  return (
+                    <div
+                      key={`empty-${index}`}
+                      aria-hidden="true"
+                      className="min-h-16 border-b border-r bg-muted/10 sm:min-h-20"
+                    />
+                  );
+                }
 
-              return (
-                <button
-                  key={formatDateKey(day)}
-                  type="button"
-                  aria-pressed={selected}
-                  aria-label={`${format(day, "MMMM d")}, ${dayCount} bookings`}
-                  onClick={() => setSelectedDay(day)}
-                  className={`flex min-h-16 w-16 shrink-0 flex-col items-center justify-center rounded-md border p-1 text-center transition-colors ${
-                    selected
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border hover:bg-accent"
-                  }`}
-                >
-                  <span className="text-[10px] font-medium uppercase text-muted-foreground">
-                    {format(day, "EEE")}
-                  </span>
-                  <span className="text-sm">{format(day, "d")}</span>
-                  <span
-                    className={`text-[10px] ${
+                const dayKey = formatDateKey(day);
+                const dayCount = bookingsByDay.get(dayKey) || 0;
+                const selected = dayKey === formatDateKey(selectedDay);
+                const today = dayKey === formatDateKey(new Date());
+
+                return (
+                  <button
+                    key={dayKey}
+                    type="button"
+                    aria-pressed={selected}
+                    aria-label={`${today ? "Today, " : ""}${format(
+                      day,
+                      "MMMM d",
+                    )}, ${dayCount} ${dayCount === 1 ? "job" : "jobs"}`}
+                    onClick={() => setSelectedDay(day)}
+                    className={`flex min-h-16 flex-col items-center justify-between border-b border-r p-1.5 text-center transition-colors sm:min-h-20 sm:p-2 ${
                       selected
-                        ? "text-primary-foreground"
-                        : "text-muted-foreground"
+                        ? "bg-primary text-primary-foreground"
+                        : today
+                          ? "bg-primary/5 text-primary hover:bg-accent"
+                          : "hover:bg-accent"
                     }`}
                   >
-                    {dayCount > 0
-                      ? `${dayCount} ${dayCount === 1 ? "job" : "jobs"}`
-                      : "—"}
-                  </span>
-                </button>
-              );
-            })}
+                    <span className="text-sm font-medium">{format(day, "d")}</span>
+                    <span
+                      className={`flex min-h-3 items-center gap-1 text-[10px] ${
+                        selected
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {dayCount ? (
+                        <>
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              selected ? "bg-current" : "bg-primary"
+                            }`}
+                          />
+                          {dayCount}
+                        </>
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px]">

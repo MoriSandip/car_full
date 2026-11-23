@@ -31,6 +31,11 @@ const userSchema = new Schema<TUser>(
       enum: ['admin', 'user', 'worker'],
       default: 'user',
     },
+    adminRoleId: {
+      type: Schema.Types.ObjectId,
+      ref: 'AdminRole',
+      default: null,
+    },
     
     isDeleted: {
       type: Boolean,

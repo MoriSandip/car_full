@@ -271,6 +271,21 @@ export const workerApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Bookings'],
     }),
+    verifyAssignedVehicleQr: builder.mutation<
+      ApiResponse<{
+        bookingId: string;
+        verifiedAt: string;
+        car: {registrationNumber: string; make: string; model: string};
+      }>,
+      {bookingId: string; qrToken: string}
+    >({
+      query: ({bookingId, qrToken}) => ({
+        url: `/workers/assigned-bookings/${bookingId}/verify-vehicle`,
+        method: 'POST',
+        body: {qrToken},
+      }),
+      invalidatesTags: ['Bookings'],
+    }),
     updateCleaningProgress: builder.mutation<
       ApiResponse<Booking>,
       {
@@ -307,6 +322,7 @@ export const {
   useGetWorkerDashboardQuery,
   useGetAssignedBookingsQuery,
   usePerformWorkActionMutation,
+  useVerifyAssignedVehicleQrMutation,
   useUpdateCleaningProgressMutation,
   useGetWorkerProfileQuery,
   useGetMyAttendanceQuery,

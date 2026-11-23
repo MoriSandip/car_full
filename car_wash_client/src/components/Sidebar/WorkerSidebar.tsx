@@ -3,7 +3,6 @@ import {
   Home,
   Package2,
   PanelLeft,
-  ClipboardList,
   UserRound,
   Settings,
   CalendarCheck,
@@ -42,9 +41,9 @@ const navGroups = [
     title: "My Work",
     items: [
       {
-        title: "Assigned Bookings",
+        title: "My Schedule",
         href: "/bookings",
-        icon: ClipboardList,
+        icon: CalendarCheck,
       },
       {
         title: "Attendance",

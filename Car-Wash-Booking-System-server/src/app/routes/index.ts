@@ -19,6 +19,7 @@ import { ImageUploadRoutes } from '../../modules/Upload/imageUpload.route';
 import { reportRoute } from '../../modules/Report/report.route';
 import { inventoryRoute } from '../../modules/Inventory/inventory.route';
 import { complaintRoute } from '../../modules/Complaint/complaint.route';
+import { settingsRoute } from '../../modules/Settings/settings.route';
 
 const router = Router();
 
@@ -106,6 +107,10 @@ const moduleRoutes = [
   {
     path: '/complaints',
     route: complaintRoute,
+  },
+  {
+    path: '/settings',
+    route: settingsRoute,
   },
 
 ];

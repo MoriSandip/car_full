@@ -131,6 +131,14 @@ export interface TCarStatsResponse {
   result?: TCarStats;
 }
 
+export interface TCarQrResponse {
+  success: boolean;
+  data: {
+    registrationNumber: string;
+    qrCodeImage: string;
+  };
+}
+
 export const carApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Admin: get all cars
@@ -158,6 +166,13 @@ export const carApi = baseApi.injectEndpoints({
         method: "GET",
       }),
       providesTags: ["car"],
+    }),
+
+    getMyCarQr: builder.query<TCarQrResponse, string>({
+      query: (id) => ({
+        url: `/cars/${id}/qr`,
+        method: "GET",
+      }),
     }),
 
     // Get a single car
@@ -249,6 +264,7 @@ export const {
   useGetCarsQuery,
   useGetPendingCarsQuery,
   useGetMyCarsQuery,
+  useGetMyCarQrQuery,
   useGetSingleCarQuery,
   useCreateCarMutation,
   useUpdateCarMutation,

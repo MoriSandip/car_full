@@ -1,4 +1,5 @@
 import { USER_ROLE } from './auth.constant';
+import mongoose from 'mongoose';
 
 export type TUser = {
   id: string;
@@ -11,6 +12,7 @@ export type TUser = {
   address: string;
   isDeleted: boolean;
   userStatus: 'in-progress' | 'blocked';
+  adminRoleId?: mongoose.Types.ObjectId | null;
   createdAt?: string;
   updatedAt?: string;
 };

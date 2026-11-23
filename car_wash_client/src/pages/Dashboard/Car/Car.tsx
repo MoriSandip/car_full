@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   useCreateCarMutation,
   useDeleteCarMutation,
@@ -356,6 +357,9 @@ const Car: React.FC = () => {
     try {
       setActionError("");
       await verifyCar(car._id).unwrap();
+      toast.success(
+        "Car verified. Its QR code is now available in the customer's app.",
+      );
     } catch (error) {
       setActionError(getErrorMessage(error));
     }

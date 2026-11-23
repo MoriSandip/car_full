@@ -132,6 +132,11 @@ const carSchema = new Schema<TCar>(
       default: "",
     },
 
+    qrToken: {
+      type: String,
+      select: false,
+    },
+
     isDeleted: {
       type: Boolean,
       default: false,
@@ -155,5 +160,13 @@ carSchema.index(
 
 carSchema.index({ societyId: 1, flatId: 1 });
 carSchema.index({ createdBy: 1, verificationStatus: 1 });
+carSchema.index(
+  { qrToken: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { qrToken: { $type: "string" } },
+    name: "unique_car_qr_token",
+  },
+);
 
 export const Car = model<TCar>("Car", carSchema);

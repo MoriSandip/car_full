@@ -173,3 +173,9 @@ The Car Wash Booking System is a society-based car wash management platform cons
 ---
 
 **Project Goal:** Build a complete, scalable and multi-society Car Wash Management SaaS platform with centralized administration, efficient worker operations and a seamless customer booking experience.
+
+-- My Wallet
+
+❌ Pending
+
+Wallet balance, recharge and wallet transactions

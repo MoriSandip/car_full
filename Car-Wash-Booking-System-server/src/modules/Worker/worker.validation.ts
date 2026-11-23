@@ -73,6 +73,15 @@ const cleaningProgressValidationSchema = z.object({
     .refine((body) => Object.keys(body).length > 0, 'At least one progress field is required'),
 });
 
+const verifyAssignedVehicleQrValidationSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid booking ID'),
+  }),
+  body: z.object({
+    qrToken: z.string().regex(/^[a-f\d]{64}$/i, 'Invalid car QR code'),
+  }).strict(),
+});
+
 const cashTransactionListValidationSchema = z.object({
   query: z
     .object({
@@ -93,5 +102,6 @@ export const WorkerValidation = {
   updateWorkerValidationSchema,
   workerLoginValidationSchema,
   cleaningProgressValidationSchema,
+  verifyAssignedVehicleQrValidationSchema,
   cashTransactionListValidationSchema,
 };

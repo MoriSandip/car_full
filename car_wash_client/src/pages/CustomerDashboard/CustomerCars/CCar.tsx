@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   XCircle,
   MoreHorizontal,
+  QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,6 +26,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -47,6 +49,7 @@ import ListImage from "@/components/ListImage";
 
 import {
   useGetMyCarsQuery,
+  useGetMyCarQrQuery,
   useCreateCarMutation,
   useUpdateCarMutation,
   type TCar,
@@ -188,6 +191,7 @@ const CCar: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<TFormMode>("add");
   const [selectedCar, setSelectedCar] = useState<TCar | undefined>();
+  const [carQrTarget, setCarQrTarget] = useState<TCarItem | null>(null);
 
   const {
     data: carsResponse,
@@ -199,6 +203,8 @@ const CCar: React.FC = () => {
 
   const [createCar, { isLoading: isCreating }] = useCreateCarMutation();
   const [updateCar, { isLoading: isUpdating }] = useUpdateCarMutation();
+  const carQrId = carQrTarget?._id || carQrTarget?.id || "";
+  const carQrQuery = useGetMyCarQrQuery(carQrId, { skip: !carQrId });
 
   // FIX: Backend cars are inside response.data.result.
   const cars = useMemo<TCarItem[]>(
@@ -531,6 +537,14 @@ const CCar: React.FC = () => {
                             </DropdownMenuTrigger>
 
                             <DropdownMenuContent align="end">
+                              {getVerificationStatus(car) === "VERIFIED" ? (
+                                <DropdownMenuItem
+                                  onClick={() => setCarQrTarget(car)}
+                                >
+                                  <QrCode className="mr-2 h-4 w-4" />
+                                  Show car QR
+                                </DropdownMenuItem>
+                              ) : null}
                               <DropdownMenuItem
                                 onClick={() => openViewDialog(car)}
                               >
@@ -594,6 +608,16 @@ const CCar: React.FC = () => {
                     </p>
 
                     <div className="mt-4 flex gap-2">
+                      {getVerificationStatus(car) === "VERIFIED" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCarQrTarget(car)}
+                        >
+                          <QrCode className="mr-1 h-4 w-4" />
+                          Show QR
+                        </Button>
+                      ) : null}
                       <Button
                         variant="outline"
                         size="sm"
@@ -644,6 +668,52 @@ const CCar: React.FC = () => {
             onClose={() => setDialogOpen(false)}
             onSubmit={handleSubmit}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(carQrTarget)}
+        onOpenChange={(open) => {
+          if (!open) setCarQrTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Verified car QR code</DialogTitle>
+            <DialogDescription>
+              Show this code to your assigned worker before the wash starts.
+            </DialogDescription>
+          </DialogHeader>
+          {carQrQuery.isLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Loading QR code...
+            </p>
+          ) : carQrQuery.isError || !carQrQuery.data?.data.qrCodeImage ? (
+            <div className="space-y-3 py-6 text-center">
+              <p className="text-sm text-red-600">
+                The QR code could not be loaded. Confirm the car is verified and
+                try again.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void carQrQuery.refetch()}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3">
+              <img
+                src={carQrQuery.data.data.qrCodeImage}
+                alt={`Verification QR for ${carQrQuery.data.data.registrationNumber}`}
+                className="h-64 w-64 rounded-md border bg-white p-2"
+              />
+              <p className="font-semibold">
+                {carQrQuery.data.data.registrationNumber}
+              </p>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

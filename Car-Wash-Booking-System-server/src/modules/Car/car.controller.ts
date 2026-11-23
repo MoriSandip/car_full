@@ -120,6 +120,21 @@ const getMyCars = async (req: Request, res: Response) => {
   }
 };
 
+const getMyCarQr = async (req: Request, res: Response) => {
+  try {
+    const { userId } = getAuthenticatedUser(req);
+    const result = await CarServices.getMyCarQr(req.params.id, userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Verified car QR code retrieved successfully",
+      data: result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
 const getCarStats = async (_req: Request, res: Response) => {
   try {
     const result = await CarServices.getCarStats();
@@ -186,7 +201,7 @@ const verifyCar = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      message: "Car verified successfully",
+      message: "Car verified successfully. QR code is available in the customer's app.",
       data: result,
     });
   } catch (error) {
@@ -238,6 +253,7 @@ export const CarControllers = {
   createCar,
   getAllCars,
   getMyCars,
+  getMyCarQr,
   getCarStats,
   getSingleCar,
   updateCar,

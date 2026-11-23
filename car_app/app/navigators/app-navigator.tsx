@@ -48,8 +48,8 @@ const BookingTabIcon = ({color, size}: {color: string; size: number}) => (
 const ProfileTabIcon = ({color, size}: {color: string; size: number}) => (
   <Feather name="user" color={color} size={size} />
 );
-const JobsTabIcon = ({color, size}: {color: string; size: number}) => (
-  <Feather name="briefcase" color={color} size={size} />
+const ScheduleTabIcon = ({color, size}: {color: string; size: number}) => (
+  <Feather name="calendar" color={color} size={size} />
 );
 const ClockTabIcon = ({color, size}: {color: string; size: number}) => (
   <Feather name="clock" color={color} size={size} />
@@ -118,9 +118,9 @@ const WorkerTabs = () => (
       name="WorkerJobs"
       component={WorkerJobsScreen}
       options={{
-        title: 'Assigned jobs',
-        tabBarLabel: 'Jobs',
-        tabBarIcon: JobsTabIcon,
+        title: 'My Schedule',
+        tabBarLabel: 'Schedule',
+        tabBarIcon: ScheduleTabIcon,
       }}
     />
     <Tab.Screen

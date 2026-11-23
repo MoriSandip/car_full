@@ -67,6 +67,20 @@ export type CustomerSupportTicket = {
   updatedAt: string;
 };
 
+export type CustomerAppSettings = {
+  general: {
+    appName: string;
+    supportEmail: string;
+    supportPhone: string;
+  };
+  booking: {
+    allowSameDayBookings: boolean;
+    maxAdvanceDays: number;
+    cancellationCutoffHours: number;
+    reschedulingCutoffHours: number;
+  };
+};
+
 export type CustomerPaymentTransaction = {
   _id: string;
   bookingId?: {
@@ -207,6 +221,12 @@ export const customerApi = api.injectEndpoints({
         normalizeList(response),
       providesTags: ['Cars'],
     }),
+    getMyCarQr: builder.query<
+      ApiEnvelope<{registrationNumber: string; qrCodeImage: string}>,
+      string
+    >({
+      query: id => `/cars/${id}/qr`,
+    }),
     uploadImage: builder.mutation<
       ApiEnvelope<{url: string}>,
       {image: string; mimeType: string}
@@ -300,6 +320,9 @@ export const customerApi = api.injectEndpoints({
               {type: 'Complaints' as const, id: 'CUSTOMER_LIST'},
             ]
           : [{type: 'Complaints' as const, id: 'CUSTOMER_LIST'}],
+    }),
+    getPublicAppSettings: builder.query<ApiEnvelope<CustomerAppSettings>, void>({
+      query: () => ({url: '/settings/public'}),
     }),
     getMySupportTicket: builder.query<
       ApiEnvelope<CustomerSupportTicket>,
@@ -471,6 +494,7 @@ export const {
   useGetMyReferralQuery,
   useGetCustomerProfileQuery,
   useGetMyCarsQuery,
+  useGetMyCarQrQuery,
   useUploadImageMutation,
   useCreateCustomerCarMutation,
   useUpdateCustomerCarMutation,
@@ -485,6 +509,7 @@ export const {
   useGetAvailableSlotsQuery,
   useGetMyBookingsQuery,
   useGetMySupportTicketsQuery,
+  useGetPublicAppSettingsQuery,
   useGetMySupportTicketQuery,
   useCreateSupportTicketMutation,
   useReplyToSupportTicketMutation,

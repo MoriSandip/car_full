@@ -53,6 +53,12 @@ router.patch(
   auth("WORKER"),
   WorkerControllers.updateAssignedBookingWork,
 );
+router.post(
+  '/assigned-bookings/:id/verify-vehicle',
+  auth('WORKER'),
+  validateRequest(WorkerValidation.verifyAssignedVehicleQrValidationSchema),
+  WorkerControllers.verifyAssignedVehicleQr,
+);
 router.patch(
   '/assigned-bookings/:id/progress',
   auth('WORKER'),

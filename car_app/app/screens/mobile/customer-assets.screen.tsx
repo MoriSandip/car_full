@@ -45,6 +45,7 @@ import {
   useDeleteCustomerFlatMutation,
   useGetCustomerProfileQuery,
   useGetMyCarsQuery,
+  useGetMyCarQrQuery,
   useGetMyFlatsQuery,
   useGetMySocietiesQuery,
   useUploadImageMutation,
@@ -145,6 +146,7 @@ const CustomerAssetsScreen = ({ route }: Props) => {
   const [selectedSociety, setSelectedSociety] = useState<Society | null>(null);
   const [selectedFlat, setSelectedFlat] = useState<Flat | null>(null);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
+  const [carQrId, setCarQrId] = useState('');
   const [societyForm, setSocietyForm] = useState(societyDefaults);
   const [flatForm, setFlatForm] = useState(flatDefaults);
   const [carForm, setCarForm] = useState(carDefaults);
@@ -168,6 +170,7 @@ const CustomerAssetsScreen = ({ route }: Props) => {
     skip: section === 'society',
   });
   const carQuery = useGetMyCarsQuery(undefined, { skip: section !== 'car' });
+  const carQrQuery = useGetMyCarQrQuery(carQrId, { skip: !carQrId });
   const profileQuery = useGetCustomerProfileQuery(undefined, {
     skip: section !== 'car',
   });
@@ -1366,8 +1369,57 @@ const CustomerAssetsScreen = ({ route }: Props) => {
                 value={selectedCar.verificationNote}
               />
             </AssetSection>
+            {selectedCar.verificationStatus === 'VERIFIED' ? (
+              <ActionButton
+                title="Show car QR code"
+                onPress={() => {
+                  setCarQrId(selectedCar._id);
+                  setSelectedCar(null);
+                }}
+                variant="secondary"
+              />
+            ) : (
+              <InfoMessage
+                text="The QR code will be available after admin verification."
+              />
+            )}
           </>
         ) : null}
+      </DetailsSheet>
+      <DetailsSheet
+        visible={Boolean(carQrId)}
+        setVisible={visible => !visible && setCarQrId('')}
+        title="Verified car QR code">
+        {carQrQuery.isLoading ? (
+          <Text style={styles.qrCopy}>Loading QR code...</Text>
+        ) : carQrQuery.isError || !carQrQuery.data?.data.qrCodeImage ? (
+          <>
+            <InfoMessage
+              text="Could not load this car's QR code. Confirm the car is verified and retry."
+              variant="error"
+            />
+            <ActionButton
+              title="Retry"
+              variant="secondary"
+              onPress={() => carQrQuery.refetch()}
+            />
+          </>
+        ) : (
+          <View style={styles.qrCodePanel}>
+            <Text style={styles.cardTitle}>
+              {carQrQuery.data.data.registrationNumber}
+            </Text>
+            <Image
+              source={{uri: carQrQuery.data.data.qrCodeImage}}
+              style={styles.qrCodeImage}
+              resizeMode="contain"
+              accessibilityLabel={`Verification QR for ${carQrQuery.data.data.registrationNumber}`}
+            />
+            <Text style={styles.qrCopy}>
+              Show this code to your assigned worker before the wash starts.
+            </Text>
+          </View>
+        )}
       </DetailsSheet>
     </Page>
   );
@@ -2033,6 +2085,23 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 14,
     backgroundColor: colors.canvas,
+  },
+  qrCodePanel: {
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  qrCopy: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.muted,
+    textAlign: 'center',
+  },
+  qrCodeImage: {
+    width: 280,
+    height: 280,
+    maxWidth: '100%',
+    backgroundColor: colors.white,
   },
   carDetailPlaceholder: {
     width: '100%',

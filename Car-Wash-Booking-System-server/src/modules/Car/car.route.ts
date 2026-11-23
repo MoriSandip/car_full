@@ -5,6 +5,7 @@ import { USER_ROLE } from "../Auth/auth.constant";
 import { CarControllers } from "./car.controller";
 import {
   createCarValidationSchema,
+  carQrParamsSchema,
   updateCarValidationSchema,
   rejectCarValidationSchema,
 } from "./car.validation";
@@ -16,6 +17,13 @@ route.get(
   "/my",
   auth("CUSTOMER"),
   CarControllers.getMyCars,
+);
+
+route.get(
+  "/:id/qr",
+  auth("CUSTOMER"),
+  validateRequest(carQrParamsSchema),
+  CarControllers.getMyCarQr,
 );
 
 // ADMIN: pending cars for approval

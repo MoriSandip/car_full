@@ -1,4 +1,6 @@
+import { randomBytes } from "crypto";
 import { Types } from "mongoose";
+import QRCode from "qrcode";
 import { Car } from "./car.model";
 import Flat from "../Flat/flat.model";
 import { Society } from "../Society/society.model";
@@ -180,6 +182,7 @@ const createCar = async (
     verifiedBy: isAdmin ? new Types.ObjectId(userId) : null,
     verifiedAt: isAdmin ? new Date() : null,
     verificationNote: "",
+    qrToken: isAdmin ? randomBytes(32).toString("hex") : undefined,
 
     isDeleted: false,
   });
@@ -238,6 +241,52 @@ const getAllCars = async (query: Record<string, unknown>) => {
   return populateCar(
     Car.find(filter).sort({ createdAt: -1 }),
   );
+};
+
+const getMyCarQr = async (carId: string, userId: string) => {
+  validateObjectId(carId, "Car");
+  validateObjectId(userId, "User");
+
+  const filter = {
+    _id: new Types.ObjectId(carId),
+    createdBy: new Types.ObjectId(userId),
+    createdByRole: "CUSTOMER",
+    isDeleted: false,
+  };
+  let car = await Car.findOne(filter).select("+qrToken");
+
+  if (!car) throw new Error("Car not found");
+  if (car.verificationStatus !== "VERIFIED") {
+    throw new Error("Car must be verified by admin before its QR is available");
+  }
+
+  if (!car.qrToken) {
+    car = await Car.findOneAndUpdate(
+      {
+        ...filter,
+        verificationStatus: "VERIFIED",
+        $or: [{ qrToken: { $exists: false } }, { qrToken: null }],
+      },
+      { $set: { qrToken: randomBytes(32).toString("hex") } },
+      { new: true, runValidators: true },
+    ).select("+qrToken");
+    if (!car) {
+      car = await Car.findOne(filter).select("+qrToken");
+    }
+  }
+
+  if (!car?.qrToken) {
+    throw new Error("Could not issue a QR code for this car");
+  }
+
+  return {
+    registrationNumber: car.registrationNumber,
+    qrCodeImage: await QRCode.toDataURL(car.qrToken, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 320,
+    }),
+  };
 };
 
 /**
@@ -372,7 +421,10 @@ const updateCar = async (
   return populateCar(
     Car.findOneAndUpdate(
       filter,
-      { $set: updateData },
+      {
+        $set: updateData,
+        ...(role === "CUSTOMER" ? { $unset: { qrToken: 1 } } : {}),
+      },
       { new: true, runValidators: true },
     ),
   );
@@ -411,6 +463,7 @@ const verifyCar = async (id: string, adminId: string) => {
           verifiedBy: new Types.ObjectId(adminId),
           verifiedAt: new Date(),
           verificationNote: "",
+          qrToken: randomBytes(32).toString("hex"),
         },
       },
       { new: true, runValidators: true },
@@ -462,6 +515,7 @@ const rejectCar = async (
           verifiedAt: null,
           verificationNote: note,
         },
+        $unset: { qrToken: 1 },
       },
       { new: true, runValidators: true },
     ),
@@ -563,6 +617,7 @@ export const CarServices = {
   createCar,
   getAllCars,
   getMyCars,
+  getMyCarQr,
   getSingleCar,
   updateCar,
   verifyCar,

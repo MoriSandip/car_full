@@ -70,6 +70,9 @@ export interface IBooking {
   afterPhoto?: string;
   cleaningChecklist?: ICleaningChecklist;
   workerNotes?: string;
+  vehicleQrVerifiedAt?: Date | null;
+  vehicleQrVerifiedBy?: Types.ObjectId | null;
+  vehicleQrVerifiedCarId?: Types.ObjectId | null;
   customerRating?: number;
   customerReview?: string;
   reviewedAt?: Date;

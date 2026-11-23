@@ -38,7 +38,7 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to the Car Wash service on your local network.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Take a profile photo, car photo, or worker attendance selfie.</string>
+	<string>Scan verified car QR codes and take profile, car, or attendance photos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose a profile photo, car photo, or cleaning photo from your photo library.</string>
 	<key>RCTNewArchEnabled</key>

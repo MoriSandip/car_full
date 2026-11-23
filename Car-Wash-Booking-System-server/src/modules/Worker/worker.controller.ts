@@ -248,6 +248,22 @@ const updateAssignedBookingWork = catchAsync(async (req, res) => {
   });
 });
 
+const verifyAssignedVehicleQr = catchAsync(async (req, res) => {
+  const workerId = (req as any).worker?._id ?? (req as any).user?.sub;
+  const result = await WorkerServices.verifyAssignedVehicleQr(
+    String(workerId || ''),
+    req.params.id,
+    req.body.qrToken,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Assigned vehicle verified successfully',
+    data: result,
+  });
+});
+
 const updateAssignedBookingProgress = catchAsync(async (req, res) => {
   const workerId = (req as any).worker?._id;
   const result = await WorkerServices.updateAssignedBookingProgress(
@@ -276,6 +292,7 @@ export const WorkerControllers = {
   getWorkerDashboard,
   getAssignedBookings,
   getMyCashTransactions,
+  verifyAssignedVehicleQr,
   updateAssignedBookingWork,
   updateAssignedBookingProgress,
 };

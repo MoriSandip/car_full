@@ -118,6 +118,17 @@ customers to `/customer/bookings` after checkout. Keep Stripe keys only in the
 server environment and use Stripe test keys and a test webhook secret during
 development.
 
+## Car QR verification
+
+Customer-added cars remain unavailable for booking until an admin verifies
+them. Verification issues a unique QR token; the customer can display that
+car's QR code from the car details in the web or mobile app. The assigned
+worker scans it from the task before starting work. The server validates car
+ownership, verification state, booking date, booking assignment, and QR match,
+then permits the start action only for the worker and car that were verified.
+Editing a customer's car returns it to pending verification and invalidates
+its previous QR token.
+
 ## Membership purchase and payment
 
 Customers can view active plans and offers for their society, buy a membership
@@ -224,6 +235,10 @@ screen. Workers can retrieve their paginated assignments with
 `toExclusive=YYYY-MM-DD` query parameters filter the schedule to a date range
 whose start is included and end is excluded. The mobile app uses these filters
 to display a month at a time and groups the returned jobs by date.
+The worker web Monthly Schedule and mobile Jobs tab display a month calendar
+with assigned-job counts by day, month navigation, a Today shortcut, and a
+time-sorted agenda for the selected date. Search and status filters update both
+the calendar counts and the selected-day agenda.
 Workers can start a confirmed booking only at or after its scheduled date and
 time in India Standard Time. The API rejects early starts with HTTP 400 and
 leaves the booking unchanged.
@@ -300,6 +315,32 @@ The admin inventory page includes society-level low-stock alerts, stock value,
 supplier and purchase-order management, partial receiving, ledger history, and
 CSV exports. Consumption is recorded manually; automatic per-wash deductions
 require configured material recipes and are not enabled.
+
+## Settings and administrator permissions
+
+The admin Settings & Permissions page supports custom administrator roles with
+per-module `view` and `manage` permissions. `manage` includes read access;
+server middleware enforces permissions for API requests as well as the web
+navigation. Existing administrator accounts without an assigned custom role
+remain Super Admins. Only Super Admins can create, edit, or delete roles and
+assign roles to administrator accounts. The API prevents removing or demoting
+the last active Super Admin.
+
+Application settings have global defaults and optional per-society overrides.
+Society settings inherit each field from global defaults unless that field is
+explicitly different; saving a value back to its global value removes that
+override. The configuration includes the application name, support email and
+phone, same-day booking availability, maximum advance booking days, and
+cancellation/rescheduling cutoffs. A cutoff of zero disables the cutoff.
+Booking policy settings are enforced server-side. The public endpoint
+`GET /api/v1/settings/public?societyId=...` returns the effective, non-secret
+settings for customer applications.
+
+Super Admin endpoints are under `/api/v1/settings/roles` and
+`/api/v1/settings/admin-users`. Admins with settings view/manage access can use
+`GET /api/v1/settings/config?societyId=...`; changing or resetting settings
+requires manage permission. `GET /api/v1/settings/me/access` returns the
+authenticated administrator's effective permissions.
 
 ## Complaints and support tickets
 

@@ -21,6 +21,7 @@ import {
   Wallet,
   BarChart3,
   LifeBuoy,
+  Settings,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -42,6 +43,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import DashboardHeader from "@/pages/Dashboard/DashboardHeader/DashboardHeader";
+import {
+  useGetMyAdminAccessQuery,
+  type PermissionModule,
+} from "@/redux/features/settings/settingsApi";
 
 const navGroups = [
   {
@@ -135,6 +140,16 @@ const navGroups = [
     ],
   },
   {
+    title: "Settings & Permissions",
+    items: [
+      {
+        title: "Settings & Permissions",
+        href: "/dashboard/settings",
+        icon: Settings,
+      },
+    ],
+  },
+  {
     title: "User Management",
     items: [
       { title: "Worker Management", href: "/dashboard/workers", icon: Users2 },
@@ -148,8 +163,48 @@ const navGroups = [
   },
 ];
 
+const permissionForPath = (path: string): PermissionModule => {
+  if (path === "/dashboard") return "dashboard";
+  if (path.includes("/society")) return "societies";
+  if (path.includes("/flat")) return "flats";
+  if (path.includes("/car")) return "cars";
+  if (path.includes("/customers")) return "customers";
+  if (path.includes("/workers")) return "workers";
+  if (path.includes("/attendance") || path.includes("/leave-payroll")) {
+    return "attendancePayroll";
+  }
+  if (path.includes("/booking")) return "bookings";
+  if (path.includes("/wash-services") || path.includes("/slots")) {
+    return "services";
+  }
+  if (path.includes("/membership") || path.includes("/plan")) {
+    return "memberships";
+  }
+  if (path.includes("/offers")) return "offers";
+  if (path.includes("/payment") || path.includes("/cash-collections")) {
+    return "payments";
+  }
+  if (path.includes("/reports")) return "reports";
+  if (path.includes("/inventory")) return "inventory";
+  if (path.includes("/support")) return "support";
+  if (path.includes("/settings")) return "settings";
+  return "users";
+};
+
 const Sidebar: React.FC = () => {
   const location = useLocation();
+  const { data: accessResponse } = useGetMyAdminAccessQuery();
+  const access = accessResponse?.data;
+  const visibleNavGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (access?.isSuperAdmin) return true;
+        const permission = access?.permissions[permissionForPath(item.href)];
+        return permission?.view || permission?.manage;
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     () => Object.fromEntries(navGroups.map(({ title }) => [title, false])),
   );
@@ -224,7 +279,7 @@ const Sidebar: React.FC = () => {
               </div>
 
               <nav className="flex-1 space-y-5 overflow-y-auto p-3">
-                {navGroups.map((group) => (
+                {visibleNavGroups.map((group) => (
                   <section key={group.title}>
                     <h2 className="mb-2">
                       <button
@@ -295,7 +350,7 @@ const Sidebar: React.FC = () => {
           </div>
 
           <nav className="flex-1 space-y-4 overflow-y-auto p-2">
-            {navGroups.map((group) => (
+            {visibleNavGroups.map((group) => (
               <section key={group.title}>
                 <h2 className="mb-1">
                   <Tooltip>
