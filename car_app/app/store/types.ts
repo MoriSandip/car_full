@@ -194,6 +194,7 @@ export type MembershipOffer = {
   discountValue: number;
   startDate: string;
   endDate: string;
+  couponCode?: string;
 };
 
 export type WorkerDashboard = {

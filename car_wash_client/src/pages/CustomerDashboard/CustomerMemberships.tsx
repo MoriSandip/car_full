@@ -28,6 +28,7 @@ import {
   type TMembership,
 } from "@/redux/features/membership/membershipApi";
 import { useGetMyCarsQuery } from "@/redux/features/car/carApi";
+import { useGetMyReferralQuery } from "@/redux/features/offer/offerApi";
 
 type Related =
   | string
@@ -74,6 +75,9 @@ const CustomerMemberships = () => {
   const [carId, setCarId] = useState("");
   const [planId, setPlanId] = useState("");
   const [offerId, setOfferId] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const referralQuery = useGetMyReferralQuery();
   const [startDate, setStartDate] = useState(() =>
     new Date().toISOString().slice(0, 10),
   );
@@ -181,6 +185,8 @@ const CustomerMemberships = () => {
         carId,
         planId,
         ...(offerId ? { offerId } : {}),
+        ...(couponCode ? { couponCode: couponCode.trim().toUpperCase() } : {}),
+        ...(referralCode ? { referralCode: referralCode.trim().toUpperCase() } : {}),
         startDate,
       }).unwrap();
       if (membership.paymentStatus === "Paid") {
@@ -207,6 +213,37 @@ const CustomerMemberships = () => {
           payment.
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Offers & Referral Rewards</CardTitle>
+          <CardDescription>
+            Share your referral code and earn ₹100 reward when a referred member completes a membership.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border p-3">
+            <p className="text-xs text-slate-500">Your referral code</p>
+            <p className="mt-1 font-mono text-lg font-bold">
+              {referralQuery.data?.data?.code ?? "Loading..."}
+            </p>
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="text-xs text-slate-500">Total referrals</p>
+            <p className="mt-1 text-lg font-bold">{referralQuery.data?.data?.totalReferrals ?? 0}</p>
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="text-xs text-slate-500">Completed referrals</p>
+            <p className="mt-1 text-lg font-bold">{referralQuery.data?.data?.completedReferrals ?? 0}</p>
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="text-xs text-slate-500">Earned rewards</p>
+            <p className="mt-1 text-lg font-bold text-emerald-700">
+              ₹{referralQuery.data?.data?.earnedAmount ?? 0}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -317,6 +354,26 @@ const CustomerMemberships = () => {
               </select>
             </label>
           )}
+          <label className="space-y-2 text-sm font-medium">
+            Coupon code (optional)
+            <input
+              value={couponCode}
+              maxLength={30}
+              placeholder="Enter coupon"
+              onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+              className="h-10 w-full rounded-md border bg-background px-3 uppercase"
+            />
+          </label>
+          <label className="space-y-2 text-sm font-medium">
+            Referral code (optional)
+            <input
+              value={referralCode}
+              maxLength={30}
+              placeholder="Enter friend's referral code"
+              onChange={(event) => setReferralCode(event.target.value.toUpperCase())}
+              className="h-10 w-full rounded-md border bg-background px-3 uppercase"
+            />
+          </label>
           <label className="space-y-2 text-sm font-medium">
             Start date
             <input

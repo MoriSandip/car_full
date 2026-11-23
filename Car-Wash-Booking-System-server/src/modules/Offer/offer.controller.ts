@@ -60,10 +60,62 @@ const deleteOffer = async (req: Request, res: Response) => {
   }
 };
 
+const validateCoupon = async (req: Request, res: Response) => {
+  try {
+    const data = await OfferServices.validateCoupon(
+      String(req.user.sub),
+      String(req.body.planId),
+      String(req.body.code),
+    );
+    return res.status(200).json({ success: true, message: "Coupon is valid", data });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+const getReferralSummary = async (req: Request, res: Response) => {
+  try {
+    const data = await OfferServices.getReferralSummary(String(req.user.sub));
+    return res.status(200).json({ success: true, message: "Referral summary retrieved", data });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+const redeemReferralCode = async (req: Request, res: Response) => {
+  try {
+    const data = await OfferServices.redeemReferralCode(
+      String(req.user.sub),
+      String(req.body.code),
+    );
+    return res.status(200).json({ success: true, message: "Referral code applied", data });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
+const getReferralList = async (_req: Request, res: Response) => {
+  try {
+    const { default: Referral } = await import("./referral.model");
+    const data = await Referral.find()
+      .populate("referrerId", "name email phone")
+      .populate("referredId", "name email phone")
+      .sort({ createdAt: -1 })
+      .lean();
+    return res.status(200).json({ success: true, message: "Referrals retrieved", data });
+  } catch (error) {
+    return sendError(res, error);
+  }
+};
+
 export const OfferControllers = {
   createOffer,
   getOffers,
   getOffer,
   updateOffer,
   deleteOffer,
+  validateCoupon,
+  getReferralSummary,
+  redeemReferralCode,
+  getReferralList,
 };

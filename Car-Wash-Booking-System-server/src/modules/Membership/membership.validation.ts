@@ -23,6 +23,8 @@ const membershipFields = {
   carId: objectId,
   planId: objectId,
   offerId: objectId.optional(),
+  couponCode: z.string().trim().min(4).max(30).optional(),
+  referralCode: z.string().trim().min(4).max(30).optional(),
   societyId: objectId,
   flatId: objectId,
   startDate: z.coerce.date(),

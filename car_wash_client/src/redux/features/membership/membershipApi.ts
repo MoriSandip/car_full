@@ -125,6 +125,7 @@ export interface TMembershipOffer {
   discountValue: number;
   startDate: string;
   endDate: string;
+  couponCode?: string;
 }
 
 const getData = <T>(response: unknown): T => {
@@ -197,7 +198,7 @@ export const membershipApi = baseApi.injectEndpoints({
 
     purchaseCustomerMembership: builder.mutation<
       TMembership,
-      { carId: string; planId: string; offerId?: string; startDate?: string }
+      { carId: string; planId: string; offerId?: string; couponCode?: string; referralCode?: string; startDate?: string }
     >({
       query: (body) => ({
         url: "/memberships/purchase",

@@ -21,6 +21,16 @@ const offerSchema = new Schema<TOffer>(
       required: true,
       min: 0,
     },
+    couponCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      index: true,
+      sparse: true,
+    },
+    usageLimit: { type: Number, min: 1 },
+    perCustomerLimit: { type: Number, min: 1, default: 1 },
+    redeemedCount: { type: Number, min: 0, default: 0 },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     status: {

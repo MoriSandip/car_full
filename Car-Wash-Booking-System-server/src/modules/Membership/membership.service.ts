@@ -7,6 +7,7 @@ import Flat from "../Flat/flat.model";
 import Plan from "../PlanCharges/plan.model";
 import Offer from "../Offer/offer.model";
 import Booking from "../Booking/booking.model";
+import { OfferServices } from "../Offer/offer.service";
 
 type MembershipFilters = {
   search?: string;
@@ -426,7 +427,7 @@ async function createMembership(payload: {
 
 async function createCustomerMembership(
   customerId: string,
-  payload: { carId: string; planId: string; offerId?: string; startDate?: Date },
+  payload: { carId: string; planId: string; offerId?: string; couponCode?: string; referralCode?: string; startDate?: Date },
 ) {
   validId(customerId);
   validId(payload.carId);
@@ -454,6 +455,10 @@ async function createCustomerMembership(
     throw serviceError("Active plan not found for this car's society", 404);
   }
 
+  if (payload.referralCode) {
+    await OfferServices.redeemReferralCode(customerId, payload.referralCode);
+  }
+
   const startDate = payload.startDate ? new Date(payload.startDate) : new Date();
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -466,13 +471,21 @@ async function createCustomerMembership(
   endDate.setUTCDate(endDate.getUTCDate() + plan.validityDays);
   endDate.setUTCMilliseconds(endDate.getUTCMilliseconds() - 1);
 
-  const relations = {
+  const relations: MembershipRelations = {
     carId: String(car._id),
     societyId: String(car.societyId),
     flatId: String(car.flatId),
     planId: String(plan._id),
     ...(payload.offerId ? { offerId: payload.offerId } : {}),
   };
+  if (payload.couponCode) {
+    const coupon = await OfferServices.validateCoupon(
+      customerId,
+      String(plan._id),
+      payload.couponCode,
+    );
+    relations.offerId = coupon.offerId;
+  }
   const { amount, includedWashes, offerId } = await validateRelations(
     relations,
     true,
@@ -500,6 +513,24 @@ async function createCustomerMembership(
     paymentStatus: amount === 0 ? "Paid" : "Pending",
     isDeleted: false,
   });
+  if (offerId && payload.couponCode) {
+    await OfferServices.recordCouponRedemption(
+      customerId,
+      offerId,
+      String(membership._id),
+    );
+  }
+  const referralReward = await OfferServices.applyCompletedReferralReward(
+    customerId,
+    String(membership._id),
+    amount,
+  );
+  if (referralReward.referralReward > 0 && referralReward.amount !== amount) {
+    membership.totalAmount = referralReward.amount;
+    membership.status = referralReward.amount === 0 ? "Active" : "Pending";
+    membership.paymentStatus = referralReward.amount === 0 ? "Paid" : "Pending";
+    await membership.save();
+  }
 
   return populateMembership(Membership.findById(membership._id));
 }

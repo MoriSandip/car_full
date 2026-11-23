@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -54,6 +53,9 @@ const blankOffer: TOfferForm = {
   startDate: new Date().toISOString().slice(0, 10),
   endDate: "",
   status: "Active",
+  couponCode: "",
+  usageLimit: undefined,
+  perCustomerLimit: 1,
 };
 
 const getPlans = (response: unknown): TPlan[] => {
@@ -143,6 +145,9 @@ export default function Offers() {
             startDate: offer.startDate.slice(0, 10),
             endDate: offer.endDate.slice(0, 10),
             status: offer.status,
+            couponCode: offer.couponCode ?? "",
+            usageLimit: offer.usageLimit,
+            perCustomerLimit: offer.perCustomerLimit ?? 1,
           }
         : { ...blankOffer },
     );
@@ -173,6 +178,9 @@ export default function Offers() {
       ...form,
       title: form.title.trim(),
       description: form.description?.trim() ?? "",
+      couponCode: form.couponCode?.trim().toUpperCase() || undefined,
+      usageLimit: form.usageLimit || undefined,
+      perCustomerLimit: form.perCustomerLimit || 1,
       startDate: `${form.startDate}T00:00:00.000Z`,
       endDate: `${form.endDate}T23:59:59.999Z`,
     };
@@ -360,6 +368,40 @@ export default function Offers() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="Active">Active</SelectItem><SelectItem value="Inactive">Inactive</SelectItem></SelectContent>
                 </Select>
+              </div>
+              <h3 className="col-span-full border-b pb-2 text-sm font-semibold">
+                Coupon settings
+              </h3>
+              <div className="space-y-2">
+                <Label htmlFor="coupon-code">Coupon code (optional)</Label>
+                <Input
+                  id="coupon-code"
+                  value={form.couponCode ?? ""}
+                  maxLength={30}
+                  placeholder="SAVE100"
+                  onChange={(event) => setField("couponCode", event.target.value.toUpperCase())}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="usage-limit">Total usage limit</Label>
+                <Input
+                  id="usage-limit"
+                  type="number"
+                  min="1"
+                  value={form.usageLimit ?? ""}
+                  placeholder="Unlimited"
+                  onChange={(event) => setField("usageLimit", event.target.value ? Number(event.target.value) : undefined)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="per-customer-limit">Uses per customer</Label>
+                <Input
+                  id="per-customer-limit"
+                  type="number"
+                  min="1"
+                  value={form.perCustomerLimit ?? 1}
+                  onChange={(event) => setField("perCustomerLimit", Number(event.target.value) || 1)}
+                />
               </div>
               <div className="space-y-2 sm:col-span-2 xl:col-span-3">
                 <Label htmlFor="offer-description">Description</Label>

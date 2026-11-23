@@ -10,6 +10,10 @@ import {
 } from "./offer.validation";
 
 const route = express.Router();
+route.post("/coupon/validate", auth("CUSTOMER"), OfferControllers.validateCoupon);
+route.get("/referral/me", auth("CUSTOMER"), OfferControllers.getReferralSummary);
+route.post("/referral/redeem", auth("CUSTOMER"), OfferControllers.redeemReferralCode);
+route.get("/referrals", auth(USER_ROLE.admin), OfferControllers.getReferralList);
 route.post("/", auth(USER_ROLE.admin), validateRequest(createOfferValidationSchema), OfferControllers.createOffer);
 route.get("/", auth(USER_ROLE.admin, "CUSTOMER"), OfferControllers.getOffers);
 route.get("/:id", auth(USER_ROLE.admin, "CUSTOMER"), validateRequest(offerIdValidationSchema), OfferControllers.getOffer);

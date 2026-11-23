@@ -11,6 +11,7 @@ export interface ICustomer {
   imageUrl?: string;
   role: "CUSTOMER";
   status: "ACTIVE" | "INACTIVE";
+  referralCode?: string;
 }
 
 const customerSchema = new Schema<ICustomer>(
@@ -58,6 +59,13 @@ const customerSchema = new Schema<ICustomer>(
       type: String,
       enum: ["ACTIVE", "INACTIVE"],
       default: "ACTIVE",
+    },
+    referralCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      unique: true,
+      sparse: true,
     },
   },
   { timestamps: true }

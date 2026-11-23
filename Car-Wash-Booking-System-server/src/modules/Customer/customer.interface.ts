@@ -8,6 +8,7 @@ export type TCustomer = {
   phone: string;
   password: string;
   status: keyof typeof CUSTOMER_STATUS;
+  referralCode?: string;
   address?: string;
   imageUrl?: string;
   createdAt?: Date;

@@ -32,6 +32,7 @@ import {
   useGetMembershipPlansQuery,
   useGetMyCarsQuery,
   useGetMyMembershipsQuery,
+  useGetMyReferralQuery,
   usePurchaseMembershipMutation,
   useStartStripeMembershipCheckoutMutation,
 } from '../../store/customer.api';
@@ -69,6 +70,8 @@ const CustomerMembershipsScreen = () => {
   const [carId, setCarId] = useState('');
   const [planId, setPlanId] = useState('');
   const [offerId, setOfferId] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [startDate, setStartDate] = useState(() => localDate(new Date()));
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [error, setError] = useState('');
@@ -83,6 +86,7 @@ const CustomerMembershipsScreen = () => {
   const membershipsQuery = useGetMyMembershipsQuery(undefined, {
     pollingInterval: 30_000,
   });
+  const referralQuery = useGetMyReferralQuery();
   const [purchase, purchaseState] = usePurchaseMembershipMutation();
   const [startCheckout, checkoutState] =
     useStartStripeMembershipCheckoutMutation();
@@ -159,6 +163,8 @@ const CustomerMembershipsScreen = () => {
         carId,
         planId,
         ...(offerId ? { offerId } : {}),
+        ...(couponCode ? { couponCode: couponCode.trim().toUpperCase() } : {}),
+        ...(referralCode ? { referralCode: referralCode.trim().toUpperCase() } : {}),
         startDate,
       }).unwrap();
       if (membership.data.paymentStatus === 'Paid') {
@@ -212,6 +218,16 @@ const CustomerMembershipsScreen = () => {
         </Pressable>
       }
     >
+      <Card style={styles.purchaseCard}>
+        <Text style={styles.sectionTitle}>Offers & Referral Rewards</Text>
+        <Text style={styles.body}>
+          Your code: {referralQuery.data?.data?.code ?? 'Loading...'}
+        </Text>
+        <Text style={styles.body}>
+          Referrals: {referralQuery.data?.data?.totalReferrals ?? 0} · Earned: ₹
+          {referralQuery.data?.data?.earnedAmount ?? 0}
+        </Text>
+      </Card>
       {!purchaseVisible && error ? (
         <InfoMessage text={error} variant="error" />
       ) : null}
@@ -355,6 +371,26 @@ const CustomerMembershipsScreen = () => {
                   </View>
                 </>
               ) : null}
+              <Text style={styles.label}>Coupon code (optional)</Text>
+              <TextField
+                value={couponCode}
+                onChangeText={value =>
+                  setCouponCode(value.toUpperCase().replace(/\s/g, ''))
+                }
+                placeholder="Enter coupon"
+                autoCapitalize="characters"
+                maxLength={30}
+              />
+              <Text style={styles.label}>Referral code (optional)</Text>
+              <TextField
+                value={referralCode}
+                onChangeText={value =>
+                  setReferralCode(value.toUpperCase().replace(/\s/g, ''))
+                }
+                placeholder="Enter friend's referral code"
+                autoCapitalize="characters"
+                maxLength={30}
+              />
               <Text style={styles.label}>Membership start date</Text>
               <Pressable
                 onPress={() => setDatePickerVisible(true)}

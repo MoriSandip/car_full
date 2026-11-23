@@ -152,6 +152,21 @@ export type CarPayload = {
 
 export const customerApi = api.injectEndpoints({
   endpoints: builder => ({
+    getMyReferral: builder.query<
+      ApiEnvelope<{
+        code: string;
+        rewardAmount: number;
+        totalReferrals: number;
+        completedReferrals: number;
+        pendingReferrals: number;
+        earnedAmount: number;
+        referrals: unknown[];
+      }>,
+      void
+    >({
+      query: () => '/offers/referral/me',
+      providesTags: ['Offers'],
+    }),
     getCustomerProfile: builder.query<ApiEnvelope<AppUser>, void>({
       query: () => '/customers/me',
       providesTags: ['Profile'],
@@ -348,7 +363,7 @@ export const customerApi = api.injectEndpoints({
     }),
     purchaseMembership: builder.mutation<
       ApiEnvelope<Membership>,
-      {carId: string; planId: string; offerId?: string; startDate?: string}
+      {carId: string; planId: string; offerId?: string; couponCode?: string; referralCode?: string; startDate?: string}
     >({
       query: body => ({url: '/memberships/purchase', method: 'POST', body}),
       invalidatesTags: ['Memberships'],
@@ -374,6 +389,7 @@ export const customerApi = api.injectEndpoints({
 });
 
 export const {
+  useGetMyReferralQuery,
   useGetCustomerProfileQuery,
   useGetMyCarsQuery,
   useUploadImageMutation,

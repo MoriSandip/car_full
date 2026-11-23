@@ -9,6 +9,10 @@ export interface TOffer {
   description?: string;
   discountType: TOfferDiscountType;
   discountValue: number;
+  couponCode?: string;
+  usageLimit?: number;
+  perCustomerLimit?: number;
+  redeemedCount: number;
   startDate: Date;
   endDate: Date;
   status: TOfferStatus;
