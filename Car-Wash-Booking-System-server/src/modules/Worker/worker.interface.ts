@@ -11,6 +11,7 @@ export type TWorker = {
   status: keyof typeof WORKER_STATUS;
   address?: string;
   imageUrl?: string;
+  monthlySalary?: number;
   createdAt?: Date;
   updatedAt?: Date;
 };

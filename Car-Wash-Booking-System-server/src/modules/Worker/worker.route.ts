@@ -7,6 +7,14 @@ import { WorkerValidation } from './worker.validation';
 import { AttendanceControllers } from '../Attendance/attendance.controller';
 import { AttendanceValidation } from '../Attendance/attendance.validation';
 import loginRateLimiter from '../../app/middlewares/loginRateLimiter';
+import { LeavePayrollControllers } from './leavePayroll.controller';
+import {
+  createLeaveValidation,
+  generatePayrollValidation,
+  leaveIdValidation,
+  reviewLeaveValidation,
+  updatePayrollValidation,
+} from './leavePayroll.validation';
 
 const router = express.Router();
 
@@ -71,6 +79,40 @@ router.post(
   AttendanceControllers.punchOut,
 );
 router.get('/attendance', auth('admin'), AttendanceControllers.getDailyReport);
+router.get('/leaves/mine', auth('WORKER'), LeavePayrollControllers.getLeaves);
+router.post(
+  '/leaves',
+  auth('WORKER'),
+  validateRequest(createLeaveValidation),
+  LeavePayrollControllers.createLeave,
+);
+router.delete(
+  '/leaves/:id',
+  auth('WORKER'),
+  validateRequest(leaveIdValidation),
+  LeavePayrollControllers.cancelLeave,
+);
+router.get('/leaves', auth('admin'), LeavePayrollControllers.getLeaves);
+router.patch(
+  '/leaves/:id/review',
+  auth('admin'),
+  validateRequest(reviewLeaveValidation),
+  LeavePayrollControllers.reviewLeave,
+);
+router.get('/payroll/mine', auth('WORKER'), LeavePayrollControllers.getPayroll);
+router.get('/payroll', auth('admin'), LeavePayrollControllers.getPayroll);
+router.post(
+  '/payroll/generate',
+  auth('admin'),
+  validateRequest(generatePayrollValidation),
+  LeavePayrollControllers.generatePayroll,
+);
+router.patch(
+  '/payroll/:id',
+  auth('admin'),
+  validateRequest(updatePayrollValidation),
+  LeavePayrollControllers.updatePayroll,
+);
 
 // Admin-only worker management
 router.post(

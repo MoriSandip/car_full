@@ -37,6 +37,36 @@ type RawListResponse<T> = {
   meta?: ListEnvelope<T>['meta'];
 };
 
+export type CustomerSupportMessage = {
+  _id: string;
+  senderRole: 'CUSTOMER' | 'ADMIN';
+  senderId: string | {name?: string};
+  message: string;
+  createdAt: string;
+};
+
+export type CustomerSupportTicket = {
+  _id: string;
+  ticketNo: string;
+  bookingId:
+    | string
+    | {
+        _id: string;
+        bookingDate?: string;
+        bookingTime?: string;
+        serviceNameSnapshot?: string;
+      }
+    | null;
+  category: 'Booking' | 'Payment' | 'Service quality' | 'Membership' | 'Other';
+  subject: string;
+  status: 'Open' | 'InProgress' | 'Resolved' | 'Closed';
+  priority: 'Low' | 'Normal' | 'High';
+  messages: CustomerSupportMessage[];
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CustomerPaymentTransaction = {
   _id: string;
   bookingId?: {
@@ -256,6 +286,55 @@ export const customerApi = api.injectEndpoints({
         normalizeList(response),
       providesTags: ['Bookings'],
     }),
+    getMySupportTickets: builder.query<ListEnvelope<CustomerSupportTicket>, void>({
+      query: () => ({url: '/complaints/mine', params: {page: 1, limit: 100}}),
+      transformResponse: (response: RawListResponse<CustomerSupportTicket>) =>
+        normalizeList(response),
+      providesTags: result =>
+        result
+          ? [
+              ...result.data.map(({_id}) => ({
+                type: 'Complaints' as const,
+                id: _id,
+              })),
+              {type: 'Complaints' as const, id: 'CUSTOMER_LIST'},
+            ]
+          : [{type: 'Complaints' as const, id: 'CUSTOMER_LIST'}],
+    }),
+    getMySupportTicket: builder.query<
+      ApiEnvelope<CustomerSupportTicket>,
+      string
+    >({
+      query: id => `/complaints/mine/${id}`,
+      providesTags: (_result, _error, id) => [
+        {type: 'Complaints', id},
+      ],
+    }),
+    createSupportTicket: builder.mutation<
+      ApiEnvelope<CustomerSupportTicket>,
+      {
+        category: CustomerSupportTicket['category'];
+        subject: string;
+        message: string;
+      }
+    >({
+      query: body => ({url: '/complaints', method: 'POST', body}),
+      invalidatesTags: [{type: 'Complaints', id: 'CUSTOMER_LIST'}],
+    }),
+    replyToSupportTicket: builder.mutation<
+      ApiEnvelope<CustomerSupportTicket>,
+      {id: string; message: string}
+    >({
+      query: ({id, message}) => ({
+        url: `/complaints/mine/${id}/replies`,
+        method: 'POST',
+        body: {message},
+      }),
+      invalidatesTags: (_result, _error, {id}) => [
+        {type: 'Complaints', id},
+        {type: 'Complaints', id: 'CUSTOMER_LIST'},
+      ],
+    }),
     getMyPaymentTransactions: builder.query<
       CustomerPaymentHistory,
       {
@@ -405,6 +484,10 @@ export const {
   useGetWashServicesQuery,
   useGetAvailableSlotsQuery,
   useGetMyBookingsQuery,
+  useGetMySupportTicketsQuery,
+  useGetMySupportTicketQuery,
+  useCreateSupportTicketMutation,
+  useReplyToSupportTicketMutation,
   useGetMyPaymentTransactionsQuery,
   useCreateCashReceiptLinkMutation,
   useUpdateCustomerBookingMutation,

@@ -139,6 +139,7 @@ const Worker: React.FC = () => {
           worker.email,
           worker.phone,
           worker.address || "",
+          worker.monthlySalary,
           worker.status,
         ].some((value) =>
           String(value || "").toLowerCase().includes(search),
@@ -226,6 +227,7 @@ const Worker: React.FC = () => {
       "Name",
       "Email",
       "Phone",
+      "Monthly Salary",
       "Status",
       "Address",
       "Created At",
@@ -235,6 +237,7 @@ const Worker: React.FC = () => {
       worker.name,
       worker.email,
       worker.phone,
+      worker.monthlySalary,
       worker.status,
       worker.address || "",
       formatDate(worker.createdAt),
@@ -400,6 +403,7 @@ const Worker: React.FC = () => {
                     <TableHead>Worker</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Address</TableHead>
+                    <TableHead>Monthly salary</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Registered</TableHead>
                     <TableHead className="text-right">
@@ -412,7 +416,7 @@ const Worker: React.FC = () => {
                   {filteredWorkers.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="h-24 text-center text-muted-foreground"
                       >
                         No workers found.
@@ -434,6 +438,10 @@ const Worker: React.FC = () => {
 
                         <TableCell className="max-w-[220px] truncate">
                           {worker.address || "—"}
+                        </TableCell>
+
+                        <TableCell>
+                          ₹{Number(worker.monthlySalary || 0).toLocaleString("en-IN")}
                         </TableCell>
 
                         <TableCell>

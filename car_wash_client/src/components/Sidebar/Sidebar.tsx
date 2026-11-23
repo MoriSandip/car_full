@@ -18,6 +18,9 @@ import {
   ClipboardCheck,
   ReceiptText,
   Banknote,
+  Wallet,
+  BarChart3,
+  LifeBuoy,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -68,6 +71,11 @@ const navGroups = [
         href: "/dashboard/attendance",
         icon: ClipboardCheck,
       },
+      {
+        title: "Leave & Payroll",
+        href: "/dashboard/leave-payroll",
+        icon: Wallet,
+      },
     ],
   },
   {
@@ -94,6 +102,36 @@ const navGroups = [
     items: [
       { title: "Payment Reconciliation", href: "/dashboard/payments", icon: ReceiptText },
       { title: "Cash Collections", href: "/dashboard/cash-collections", icon: Banknote },
+    ],
+  },
+  {
+    title: "Reports & Analytics",
+    items: [
+      {
+        title: "Reports & Analytics",
+        href: "/dashboard/reports",
+        icon: BarChart3,
+      },
+    ],
+  },
+  {
+    title: "Inventory Management",
+    items: [
+      {
+        title: "Inventory",
+        href: "/dashboard/inventory",
+        icon: Package2,
+      },
+    ],
+  },
+  {
+    title: "Customer Support",
+    items: [
+      {
+        title: "Complaints & Support",
+        href: "/dashboard/support",
+        icon: LifeBuoy,
+      },
     ],
   },
   {

@@ -19,6 +19,7 @@ const createWorkerValidationSchema = z.object({
     status: z.nativeEnum(WORKER_STATUS).optional(),
     address: z.string().optional(),
     imageUrl: z.string().trim().url().max(2048).optional().or(z.literal('')),
+    monthlySalary: z.coerce.number().finite().positive(),
   }),
 });
 
@@ -31,6 +32,7 @@ const updateWorkerValidationSchema = z.object({
     status: z.nativeEnum(WORKER_STATUS).optional(),
     address: z.string().optional(),
     imageUrl: z.string().trim().url().max(2048).optional().or(z.literal('')),
+    monthlySalary: z.coerce.number().finite().positive().optional(),
   }).refine(
     (data) => Object.keys(data).length > 0,
     'At least one field is required',

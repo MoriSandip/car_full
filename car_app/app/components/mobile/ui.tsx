@@ -90,6 +90,11 @@ const customerDrawerItems: DrawerItem[] = [
     route: 'CustomerTransactions',
     icon: 'credit-card',
   },
+  {
+    label: 'Complaints & Support',
+    route: 'CustomerSupport',
+    icon: 'life-buoy',
+  },
 ];
 
 const workerDrawerItems: DrawerItem[] = [
@@ -105,6 +110,7 @@ const workerDrawerItems: DrawerItem[] = [
     icon: 'dollar-sign',
   },
   { label: 'My profile', route: 'WorkerProfile', icon: 'user' },
+  { label: 'Leave & payslips', route: 'WorkerLeavePayroll', icon: 'briefcase' },
 ];
 
 type DrawerItem = {
@@ -131,6 +137,7 @@ const screenTitles: Record<string, string> = {
   CustomerProfile: 'Profile',
   CustomerBookings: 'My bookings',
   CustomerTransactions: 'Payment history',
+  CustomerSupport: 'Complaints & Support',
   CustomerStatus: 'Cleaning status',
   CustomerMemberships: 'Memberships',
   CustomerSociety: 'Society',
@@ -142,6 +149,7 @@ const screenTitles: Record<string, string> = {
   WorkerAttendanceReport: 'Attendance report',
   WorkerCashTransactions: 'Cash transactions',
   WorkerProfile: 'Profile',
+  WorkerLeavePayroll: 'Leave & payslips',
 };
 
 export const MobileDrawerProvider = ({ children }: PropsWithChildren) => {
@@ -170,7 +178,8 @@ export const MobileDrawerProvider = ({ children }: PropsWithChildren) => {
       | 'CustomerSociety'
       | 'CustomerFlat'
       | 'CustomerCar'
-      | 'CustomerTransactions',
+      | 'CustomerTransactions'
+      | 'CustomerSupport',
   ) => {
     const homeRoute = {
       name: 'CustomerMain' as const,
@@ -185,7 +194,8 @@ export const MobileDrawerProvider = ({ children }: PropsWithChildren) => {
     screenName:
       | 'WorkerAttendanceReport'
       | 'WorkerCashTransactions'
-      | 'WorkerProfile',
+      | 'WorkerProfile'
+      | 'WorkerLeavePayroll',
   ) => {
     const homeRoute = {
       name: 'WorkerMain' as const,
@@ -230,6 +240,9 @@ export const MobileDrawerProvider = ({ children }: PropsWithChildren) => {
       case 'CustomerTransactions':
         resetCustomerStack('CustomerTransactions');
         break;
+      case 'CustomerSupport':
+        resetCustomerStack('CustomerSupport');
+        break;
       case 'WorkerAttendanceReport':
         resetWorkerStack('WorkerAttendanceReport');
         break;
@@ -249,6 +262,9 @@ export const MobileDrawerProvider = ({ children }: PropsWithChildren) => {
         break;
       case 'WorkerProfile':
         resetWorkerStack('WorkerProfile');
+        break;
+      case 'WorkerLeavePayroll':
+        resetWorkerStack('WorkerLeavePayroll');
         break;
     }
   };

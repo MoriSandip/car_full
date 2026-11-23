@@ -16,6 +16,9 @@ import { workerRoutes } from '../../modules/Worker/worker.route';
 import { customerRoutes } from '../../modules/Customer/customer.route';
 import { offerRoute } from '../../modules/Offer/offer.route';
 import { ImageUploadRoutes } from '../../modules/Upload/imageUpload.route';
+import { reportRoute } from '../../modules/Report/report.route';
+import { inventoryRoute } from '../../modules/Inventory/inventory.route';
+import { complaintRoute } from '../../modules/Complaint/complaint.route';
 
 const router = Router();
 
@@ -91,6 +94,18 @@ const moduleRoutes = [
    {
     path: '/customers',
     route: customerRoutes,
+  },
+  {
+    path: '/reports',
+    route: reportRoute,
+  },
+  {
+    path: '/inventory',
+    route: inventoryRoute,
+  },
+  {
+    path: '/complaints',
+    route: complaintRoute,
   },
 
 ];

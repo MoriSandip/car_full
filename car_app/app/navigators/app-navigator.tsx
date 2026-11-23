@@ -24,11 +24,13 @@ import CustomerPaymentHistoryScreen from '../screens/mobile/customer-payment-his
 import CustomerStatusScreen from '../screens/mobile/customer-status.screen';
 import CustomerAssetsScreen from '../screens/mobile/customer-assets.screen';
 import CustomerMembershipsScreen from '../screens/mobile/customer-memberships.screen';
+import CustomerSupportScreen from '../screens/mobile/customer-support.screen';
 import WorkerHomeScreen from '../screens/mobile/worker-home.screen';
 import WorkerJobsScreen from '../screens/mobile/worker-jobs.screen';
 import WorkerAttendanceScreen from '../screens/mobile/worker-attendance.screen';
 import WorkerAttendanceReportScreen from '../screens/mobile/worker-attendance-report.screen';
 import WorkerCashTransactionsScreen from '../screens/mobile/worker-cash-transactions.screen';
+import WorkerLeavePayrollScreen from '../screens/mobile/worker-leave-payroll.screen';
 import ProfileScreen from '../screens/mobile/profile.screen';
 import ApiRequestUi from '../components/mobile/api-request-ui';
 import PaymentReturnHandler from '../components/mobile/payment-return-handler';
@@ -146,6 +148,7 @@ const CustomerFlow = () => (
       name="CustomerMemberships"
       component={CustomerMembershipsScreen}
     />
+    <Stack.Screen name="CustomerSupport" component={CustomerSupportScreen} />
     <Stack.Screen name="CustomerSociety" component={CustomerAssetsScreen} />
     <Stack.Screen name="CustomerFlat" component={CustomerAssetsScreen} />
     <Stack.Screen name="CustomerCar" component={CustomerAssetsScreen} />
@@ -164,6 +167,10 @@ const WorkerFlow = () => (
       component={WorkerCashTransactionsScreen}
     />
     <Stack.Screen name="WorkerProfile" component={ProfileScreen} />
+    <Stack.Screen
+      name="WorkerLeavePayroll"
+      component={WorkerLeavePayrollScreen}
+    />
   </Stack.Navigator>
 );
 

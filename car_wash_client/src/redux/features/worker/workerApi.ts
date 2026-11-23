@@ -11,6 +11,7 @@ export interface TWorker {
   status: TWorkerStatus;
   address?: string;
   imageUrl?: string;
+  monthlySalary: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -23,6 +24,7 @@ export type TWorkerPayload = {
   status: TWorkerStatus;
   address?: string;
   imageUrl?: string;
+  monthlySalary?: number;
 };
 
 export type WorkerCashTransaction = {
@@ -127,6 +129,47 @@ export type WorkerAttendanceHistory = {
     total: number;
     totalPages: number;
   };
+};
+
+export type WorkerLeaveRequest = {
+    _id: string;
+    workerId: string | { _id: string; name: string };
+    startDate: string;
+    endDate: string;
+    leaveType: "Paid" | "Unpaid";
+    halfDay: boolean;
+    reason: string;
+    status: "Pending" | "Approved" | "Rejected" | "Cancelled";
+    reviewNote?: string;
+    affectedBookings?: {
+      _id: string;
+      bookingDate: string;
+      bookingTime: string;
+      serviceNameSnapshot: string;
+      societyId?: string | { name?: string };
+      carId?: string | { registrationNumber?: string };
+    }[];
+};
+
+export type WorkerPayroll = {
+    _id: string;
+    workerId: string | { _id: string; name: string };
+    periodStart: string;
+    periodEnd: string;
+    monthlySalary: number;
+    basePay: number;
+    absentDays: number;
+    paidLeaveDays: number;
+    unpaidLeaveDays: number;
+    overtimeHours: number;
+    overtimePay: number;
+    deductions: number;
+    grossPay: number;
+    netPay: number;
+    currency: string;
+    status: "Draft" | "Approved" | "Paid";
+    paidAt?: string;
+    paymentReference?: string;
 };
 
 const unwrap = (response: any) => response?.data ?? response;
@@ -404,6 +447,63 @@ updateWorkerBookingProgress: builder.mutation<
       transformResponse: unwrap,
       providesTags: ["Attendance"],
     }),
+    getMyLeaves: builder.query<WorkerLeaveRequest[], void>({
+      query: () => ({ url: "/workers/leaves/mine" }),
+      transformResponse: unwrap,
+      providesTags: ["Leave"],
+    }),
+    requestLeave: builder.mutation<
+      WorkerLeaveRequest,
+      { startDate: string; endDate: string; leaveType: "Paid" | "Unpaid"; halfDay: boolean; reason: string }
+    >({
+      query: (body) => ({ url: "/workers/leaves", method: "POST", body }),
+      transformResponse: unwrap,
+      invalidatesTags: ["Leave"],
+    }),
+    cancelLeave: builder.mutation<WorkerLeaveRequest, string>({
+      query: (id) => ({ url: `/workers/leaves/${id}`, method: "DELETE" }),
+      transformResponse: unwrap,
+      invalidatesTags: ["Leave"],
+    }),
+    getAdminLeaves: builder.query<WorkerLeaveRequest[], void>({
+      query: () => ({ url: "/workers/leaves" }),
+      transformResponse: unwrap,
+      providesTags: ["Leave"],
+    }),
+    reviewLeave: builder.mutation<
+      WorkerLeaveRequest,
+      { id: string; decision: "Approved" | "Rejected"; leaveType: "Paid" | "Unpaid"; reviewNote?: string; reassignments: { bookingId: string; workerId: string }[] }
+    >({
+      query: ({ id, ...body }) => ({ url: `/workers/leaves/${id}/review`, method: "PATCH", body }),
+      transformResponse: unwrap,
+      invalidatesTags: ["Leave", "Worker"],
+    }),
+    getMyPayroll: builder.query<WorkerPayroll[], void>({
+      query: () => ({ url: "/workers/payroll/mine" }),
+      transformResponse: unwrap,
+      providesTags: ["Payroll"],
+    }),
+    getPayroll: builder.query<WorkerPayroll[], void>({
+      query: () => ({ url: "/workers/payroll" }),
+      transformResponse: unwrap,
+      providesTags: ["Payroll"],
+    }),
+    generatePayroll: builder.mutation<
+      WorkerPayroll[],
+      { periodStart: string; periodEnd: string }
+    >({
+      query: (body) => ({ url: "/workers/payroll/generate", method: "POST", body }),
+      transformResponse: unwrap,
+      invalidatesTags: ["Payroll"],
+    }),
+    updatePayroll: builder.mutation<
+      WorkerPayroll,
+      { id: string; action: "approve" | "pay"; paymentReference?: string }
+    >({
+      query: ({ id, ...body }) => ({ url: `/workers/payroll/${id}`, method: "PATCH", body }),
+      transformResponse: unwrap,
+      invalidatesTags: ["Payroll"],
+    }),
   }),
 });
 
@@ -424,5 +524,14 @@ export const {
   useGetMyAttendanceHistoryQuery,
   useGetMyCashTransactionsQuery,
   usePunchAttendanceMutation,
-  useGetDailyAttendanceReportQuery
+  useGetDailyAttendanceReportQuery,
+  useGetMyLeavesQuery,
+  useRequestLeaveMutation,
+  useCancelLeaveMutation,
+  useGetAdminLeavesQuery,
+  useReviewLeaveMutation,
+  useGetMyPayrollQuery,
+  useGetPayrollQuery,
+  useGeneratePayrollMutation,
+  useUpdatePayrollMutation,
 } = workerApi;

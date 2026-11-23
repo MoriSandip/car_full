@@ -170,6 +170,40 @@ Do not use default or example admin credentials. Provision administrator
 accounts through a trusted, access-controlled deployment process and use a
 unique password.
 
+## Worker leave, reassignment, and payroll
+
+Set each worker's positive `monthlySalary` from the admin worker form before
+generating payroll. Workers can submit future single- or multi-day paid/unpaid
+leave requests, including half-day requests for a single date. Admin approval
+requires every active booking assigned to that worker during the leave range to
+be reassigned to an active replacement worker. Rejected requests do not affect
+payroll; approved paid/unpaid leave is included in the payroll calculation.
+
+Admins generate payroll for a custom date range (1–62 days) after the period has
+closed. The system prorates monthly salary by each calendar month's actual day
+count, deducts unpaid leave and weekday absences, and adds overtime at 1.5× the
+salary-derived hourly rate for recorded attendance beyond 8 hours per day.
+Overlapping payroll periods are rejected. Generated payslips start as Draft,
+must be approved, then can be manually marked Paid with an optional payment
+reference. Workers can view their payslips in the web/mobile app; the web
+version can be printed or saved as PDF.
+
+Worker endpoints:
+
+- `POST /api/v1/workers/leaves` and `GET /api/v1/workers/leaves/mine`
+- `DELETE /api/v1/workers/leaves/:id` (pending requests only)
+- `GET /api/v1/workers/payroll/mine`
+
+Admin endpoints:
+
+- `GET /api/v1/workers/leaves` (includes affected bookings)
+- `PATCH /api/v1/workers/leaves/:id/review` with `decision`, optional `leaveType`
+  and, when approving, `reassignments: [{ bookingId, workerId }]`
+- `POST /api/v1/workers/payroll/generate` with `periodStart` and `periodEnd`
+- `GET /api/v1/workers/payroll`
+- `PATCH /api/v1/workers/payroll/:id` with `action: "approve"` or
+  `action: "pay"` and optional `paymentReference`
+
 
 Password recovery is available for admin, customer, and worker sign-ins. Configure
 the SMTP variables above to email a single-use six-digit code. Codes expire in
@@ -219,3 +253,72 @@ Admins can retrieve a worker-wise daily report with
 `GET /api/v1/workers/attendance?date=YYYY-MM-DD` and optionally filter by
 `workerId`. Active workers without a record for the selected date are reported
 as absent.
+
+## Reports and analytics
+
+Admin reports are filterable by an inclusive `from`/`to` date range and optional
+`societyId`; a report range can cover up to 366 calendar days.
+`GET /api/v1/reports/analytics` returns booking status and daily trends,
+collected/refunded transaction totals, revenue by day and transaction type,
+payment provider totals, and society, service, and worker performance.
+Collected revenue is based on payment transactions recorded during the selected
+range; it includes both booking and membership transactions. Booking performance
+uses the scheduled booking date, while revenue uses the transaction date.
+
+`GET /api/v1/reports/bookings` returns paginated booking details for the same
+filters (`page`, default 1; `limit`, default 50 and maximum 500). Both report
+endpoints require administrator authentication. The web reports screen exports
+the analytics summaries and all matching booking rows as CSV; booking exports
+are capped at 20,000 rows per download.
+
+## Inventory and purchasing
+
+Inventory items and suppliers are shared catalog records, while stock balances
+and stock-movement history are maintained per verified society. Items have a
+unique SKU, unit, default cost, and low-stock threshold. Manual receipts,
+consumption issues, and corrections are audited in an append-only ledger;
+negative stock is rejected. Stock valuation uses weighted-average unit cost.
+
+Purchase orders progress from Draft to Ordered, can be received in multiple
+partial deliveries, and become Received when all ordered quantities arrive.
+Every received quantity updates the society balance and creates a ledger entry.
+Draft or not-yet-received orders can be cancelled. Stock adjustments and
+purchase receipts are transactional, so MongoDB must run as a replica set or
+sharded cluster (MongoDB Atlas supports this).
+
+Admin endpoints under `/api/v1/inventory`:
+
+- `GET/POST /items`, `PATCH /items/:id`
+- `GET/POST /suppliers`, `PATCH /suppliers/:id`
+- `GET /stock?societyId=...`, `POST /stock/adjust`
+- `GET /ledger?societyId=...&page=1&limit=50`
+- `GET/POST /orders?societyId=...`
+- `PATCH /orders/:id/place`, `POST /orders/:id/receive`,
+  `PATCH /orders/:id/cancel`
+
+The admin inventory page includes society-level low-stock alerts, stock value,
+supplier and purchase-order management, partial receiving, ledger history, and
+CSV exports. Consumption is recorded manually; automatic per-wash deductions
+require configured material recipes and are not enabled.
+
+## Complaints and support tickets
+
+Customers can create tickets from the web or mobile app, view only their own
+tickets, and continue the message thread until it is closed. An optional
+booking reference is accepted only when the booking belongs to the authenticated
+customer. A customer reply reopens a Resolved ticket; Closed tickets cannot
+receive customer replies.
+
+Customer endpoints:
+
+- `POST /api/v1/complaints` with `category`, `subject`, `message`, and optional
+  `bookingId`
+- `GET /api/v1/complaints/mine?page=1&limit=20`
+- `GET /api/v1/complaints/mine/:id`
+- `POST /api/v1/complaints/mine/:id/replies` with `message`
+
+Admins can search and filter the inbox, respond to customers, and update ticket
+status (`Open`, `InProgress`, `Resolved`, or `Closed`) and priority (`Low`,
+`Normal`, or `High`) from the web dashboard. Admin endpoints are
+`GET /api/v1/complaints`, `GET /api/v1/complaints/:id`,
+`POST /api/v1/complaints/:id/replies`, and `PATCH /api/v1/complaints/:id`.

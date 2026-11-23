@@ -27,6 +27,37 @@ type AttendanceHistory = {
   meta: {page: number; limit: number; total: number; totalPages: number};
 };
 
+export type WorkerLeaveRequest = {
+  _id: string;
+  startDate: string;
+  endDate: string;
+  leaveType: 'Paid' | 'Unpaid';
+  halfDay: boolean;
+  reason: string;
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
+  reviewNote?: string;
+};
+
+export type WorkerPayroll = {
+  _id: string;
+  periodStart: string;
+  periodEnd: string;
+  monthlySalary: number;
+  basePay: number;
+  absentDays: number;
+  paidLeaveDays: number;
+  unpaidLeaveDays: number;
+  overtimeHours: number;
+  overtimePay: number;
+  deductions: number;
+  grossPay: number;
+  netPay: number;
+  currency: string;
+  status: 'Draft' | 'Approved' | 'Paid';
+  paidAt?: string;
+  paymentReference?: string;
+};
+
 export type WorkerCashTransaction = {
   _id: string;
   bookingId?: {
@@ -134,6 +165,25 @@ export const workerApi = api.injectEndpoints({
         params: params ?? {},
       }),
       providesTags: ['Bookings'],
+    }),
+    getMyLeaves: builder.query<ApiResponse<WorkerLeaveRequest[]>, void>({
+      query: () => '/workers/leaves/mine',
+      providesTags: ['LeaveRequests'],
+    }),
+    requestLeave: builder.mutation<
+      ApiResponse<WorkerLeaveRequest>,
+      {startDate: string; endDate: string; leaveType: 'Paid' | 'Unpaid'; halfDay: boolean; reason: string}
+    >({
+      query: body => ({url: '/workers/leaves', method: 'POST', body}),
+      invalidatesTags: ['LeaveRequests'],
+    }),
+    cancelLeave: builder.mutation<ApiResponse<WorkerLeaveRequest>, string>({
+      query: id => ({url: `/workers/leaves/${id}`, method: 'DELETE'}),
+      invalidatesTags: ['LeaveRequests'],
+    }),
+    getMyPayroll: builder.query<ApiResponse<WorkerPayroll[]>, void>({
+      query: () => '/workers/payroll/mine',
+      providesTags: ['Payroll'],
     }),
     punchAttendance: builder.mutation<
       ApiResponse<WorkerAttendance>,
@@ -260,6 +310,10 @@ export const {
   useUpdateCleaningProgressMutation,
   useGetWorkerProfileQuery,
   useGetMyAttendanceQuery,
+  useGetMyLeavesQuery,
+  useRequestLeaveMutation,
+  useCancelLeaveMutation,
+  useGetMyPayrollQuery,
   useGetMyAttendanceHistoryQuery,
   useGetMyCashTransactionsQuery,
   usePunchAttendanceMutation,

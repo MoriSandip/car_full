@@ -161,6 +161,69 @@ describe('customer booking API', () => {
     expect(result.data[0].provider).toBe('Cash');
   });
 
+  it('submits a multi-day worker leave request', async () => {
+    store.dispatch(
+      setCredentials({
+        token: 'worker-test-token',
+        user: {
+          _id: 'worker-1',
+          name: 'Test Worker',
+          email: 'worker@example.com',
+          role: 'WORKER',
+        },
+      }),
+    );
+    const payload = {
+      startDate: '2026-12-01',
+      endDate: '2026-12-03',
+      leaveType: 'Unpaid' as const,
+      halfDay: false,
+      reason: 'Personal leave',
+    };
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ success: true, data: { _id: 'leave-1', ...payload, status: 'Pending' } }),
+        { status: 201, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    await store.dispatch(workerApi.endpoints.requestLeave.initiate(payload)).unwrap();
+    const fetchRequest = fetchMock.mock.calls[0][0] as Request;
+    expect(fetchRequest.url).toContain('/api/v1/workers/leaves');
+    expect(fetchRequest.method).toBe('POST');
+    expect(await fetchRequest.clone().json()).toEqual(payload);
+    expect(fetchRequest.headers.get('authorization')).toBe('Bearer worker-test-token');
+  });
+
+  it('loads a worker payslip from the private payroll endpoint', async () => {
+    store.dispatch(
+      setCredentials({
+        token: 'worker-test-token',
+        user: {
+          _id: 'worker-1',
+          name: 'Test Worker',
+          email: 'worker@example.com',
+          role: 'WORKER',
+        },
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: [{ _id: 'payroll-1', periodStart: '2026-10-01', periodEnd: '2026-10-31', netPay: 25000, status: 'Paid' }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    const response = await store.dispatch(workerApi.endpoints.getMyPayroll.initiate()).unwrap();
+    const fetchRequest = fetchMock.mock.calls[0][0] as Request;
+    expect(fetchRequest.url).toContain('/api/v1/workers/payroll/mine');
+    expect(fetchRequest.headers.get('authorization')).toBe('Bearer worker-test-token');
+    expect(response.data[0].netPay).toBe(25000);
+  });
+
   it('posts the active Booking API individual-booking fields', async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(

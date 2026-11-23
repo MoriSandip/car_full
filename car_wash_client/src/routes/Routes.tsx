@@ -43,6 +43,12 @@ import WorkerAttendanceReport from "@/pages/WorkerDashboard/Attendance/WorkerAtt
 import WorkerCashTransactions from "@/pages/WorkerDashboard/CashTransactions/WorkerCashTransactions";
 import EditServicePage from "@/pages/Dashboard/AllService/EditServicePage";
 import RouteMetadata from "@/components/RouteMetadata";
+import LeavePayroll from "@/pages/Dashboard/LeavePayroll/LeavePayroll";
+import WorkerLeavePayroll from "@/pages/WorkerDashboard/LeavePayroll/WorkerLeavePayroll";
+import ReportsAnalytics from "@/pages/Dashboard/Reports/ReportsAnalytics";
+import InventoryManagement from "@/pages/Dashboard/Inventory/InventoryManagement";
+import ComplaintManagement from "@/pages/Dashboard/Complaints/ComplaintManagement";
+import CustomerSupport from "@/pages/CustomerDashboard/CustomerSupport";
 
 const routes = createBrowserRouter([
   {
@@ -156,6 +162,22 @@ const routes = createBrowserRouter([
         element: <AttendanceReport />,
       },
       {
+        path: "dashboard/reports",
+        element: <ReportsAnalytics />,
+      },
+      {
+        path: "dashboard/inventory",
+        element: <InventoryManagement />,
+      },
+      {
+        path: "dashboard/support",
+        element: <ComplaintManagement />,
+      },
+      {
+        path: "dashboard/leave-payroll",
+        element: <LeavePayroll />,
+      },
+      {
         path: "dashboard/payments",
         element: <PaymentTransactions />,
       },
@@ -206,6 +228,10 @@ const routes = createBrowserRouter([
         path: "/worker/cash-transactions",
         element: <WorkerCashTransactions />,
       },
+      {
+        path: "/worker/leave-payroll",
+        element: <WorkerLeavePayroll />,
+      },
     ],
   },
   {
@@ -255,6 +281,10 @@ const routes = createBrowserRouter([
       {
         path: "memberships",
         element: <CustomerMemberships />,
+      },
+      {
+        path: "support",
+        element: <CustomerSupport />,
       },
     ],
   },

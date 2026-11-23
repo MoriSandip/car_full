@@ -42,6 +42,7 @@ export type NavigatorParamList = {
   ['CustomerTransactions']: undefined;
   ['CustomerStatus']: undefined;
   ['CustomerMemberships']: undefined;
+  ['CustomerSupport']: undefined;
   ['CustomerSociety']: undefined;
   ['CustomerFlat']: undefined;
   ['CustomerCar']: undefined;
@@ -53,6 +54,7 @@ export type NavigatorParamList = {
   ['WorkerAttendanceReport']: undefined;
   ['WorkerCashTransactions']: undefined;
   ['WorkerProfile']: undefined;
+  ['WorkerLeavePayroll']: undefined;
 };
 
 export type ScreenName = keyof NavigatorParamList;

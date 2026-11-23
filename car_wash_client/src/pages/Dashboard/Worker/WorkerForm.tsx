@@ -37,6 +37,7 @@ const defaultForm: TWorkerPayload = {
   status: "ACTIVE",
   address: "",
   imageUrl: "",
+  monthlySalary: 0,
 };
 
 const getErrorMessage = (error: any) =>
@@ -87,6 +88,7 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
       status: initialData.status || "ACTIVE",
       address: initialData.address || "",
       imageUrl: initialData.imageUrl || "",
+      monthlySalary: initialData.monthlySalary || 0,
     });
 
     setError("");
@@ -140,6 +142,7 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
       status: form.status,
       address: form.address?.trim() || "",
       imageUrl: form.imageUrl || "",
+      monthlySalary: Number(form.monthlySalary) || 0,
     };
 
     if (mode === "add" || form.password) {
@@ -235,6 +238,20 @@ const WorkerForm: React.FC<TWorkerFormProps> = ({
             disabled={isView}
             autoComplete="new-password"
             required={mode === "add"}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="worker-salary">Monthly salary (₹) *</Label>
+          <Input
+            id="worker-salary"
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={form.monthlySalary ?? 0}
+            onChange={(event) => updateField("monthlySalary", Number(event.target.value))}
+            disabled={isView}
+            required
           />
         </div>
 

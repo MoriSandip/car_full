@@ -43,6 +43,11 @@ const workerSchema = new Schema<TWorker, IWorkerModel>(
       trim: true,
       default: '',
     },
+    monthlySalary: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
   },
   {
     timestamps: true,

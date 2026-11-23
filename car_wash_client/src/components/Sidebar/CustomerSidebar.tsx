@@ -15,6 +15,7 @@ import {
   Building,
   ChevronDown,
   ChevronRight,
+  LifeBuoy,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
@@ -69,6 +70,16 @@ const navGroups = [
   {
     title: "My Vehicles",
     items: [{ title: "My Cars", href: "/customer/car", icon: CarFront }],
+  },
+  {
+    title: "Support",
+    items: [
+      {
+        title: "Complaints & Support",
+        href: "/customer/support",
+        icon: LifeBuoy,
+      },
+    ],
   },
   {
     title: "My Community",

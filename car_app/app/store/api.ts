@@ -123,6 +123,9 @@ export const api = createApi({
     'Memberships',
     'Plans',
     'Offers',
+    'LeaveRequests',
+    'Payroll',
+    'Complaints',
   ],
   endpoints: () => ({}),
 });
